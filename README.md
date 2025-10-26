@@ -4,9 +4,9 @@
 
 Started Oct 24, 2025
 
-This page as a website if github scares you
+This page as a website if github scares you [here](https://hpssjellis.github.io/my-examples-qualcomm-edgeimpulse-arduino-unoQ/)
 
-https://hpssjellis.github.io/my-examples-qualcomm-edgeimpulse-arduino-unoQ/README.md
+
 
 
 
