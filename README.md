@@ -4,6 +4,10 @@
 
 Started Oct 24, 2025
 
+This page as a website if github scares you
+
+https://hpssjellis.github.io/my-examples-qualcomm-edgeimpulse-arduino-unoQ/README.md
+
 
 
 Before making a Robotics IoT Machine learning High School course on the new Arduino UnoQ I typically make an example page where I try out some
