@@ -68,6 +68,15 @@ https://www.circuito.io/blog/arduino-uno-pinout/
 
 
 
+## Full pdf pinouts
+
+https://docs.arduino.cc/resources/pinouts/ABX00162-full-pinout.pdf
+
+### Combined front and back high resolution pinout
+
+<img width="1504" height="1517" alt="image" src="https://github.com/user-attachments/assets/43d5baa8-1867-463f-8fed-f9c18da66bb8" />
+
+
 
 
 
