@@ -64,7 +64,8 @@ https://www.circuito.io/blog/arduino-uno-pinout/
 ### Note The Pins are different on the front and the back and even some rows of pins are 1.8V not 3.3V which is great but concerning about power levels?
 
 
-<img width="1264" height="503" alt="image" src="https://github.com/user-attachments/assets/aa882934-e8ae-4b25-bc30-a211c7007797" />
+<img width="1264" height="503" alt="image" src="https://github.com/user-attachments/assets/1e504ddb-fe43-4b4f-be68-a52e542a26e2" />
+
 
 
 
