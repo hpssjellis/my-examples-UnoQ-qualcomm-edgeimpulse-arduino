@@ -6,7 +6,9 @@ Started Oct 24, 2025
 
 This page as a website if github scares you [here](https://hpssjellis.github.io/my-examples-qualcomm-edgeimpulse-arduino-unoQ/)
 
+## UnoQ playlist
 
+https://www.youtube.com/playlist?list=PL57Dnr1H_egsOqQUOiIBio2zXN2rE0QgJ
 
 
 
@@ -25,9 +27,7 @@ If curious the varieant is suppossed to be the ```STM32U585AII6Q```
 
 This might be a good starting point for my viewers.
 
-By the way my playlist is at ( I am just waiting for my 3 UnoQ's
 
-https://www.youtube.com/playlist?list=PL57Dnr1H_egsOqQUOiIBio2zXN2rE0QgJ
 
 
 ## Arduino UNOQ User Manual Helpful Links
