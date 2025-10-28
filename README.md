@@ -91,5 +91,11 @@ https://docs.arduino.cc/tutorials/uno-q/update-image/
 
 
 
+## UnoQ pin Toggel
+
+<img width="1721" height="944" alt="image" src="https://github.com/user-attachments/assets/b154309c-1af7-4c38-a04d-c945a38c6af6" />
+
+
+
 
 
