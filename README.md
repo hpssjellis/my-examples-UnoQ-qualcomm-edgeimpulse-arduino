@@ -1,4 +1,4 @@
-# my-examples-qualcomm-edgeimpulse-arduino-unoQ
+# my-examples-UnoQ-qualcomm-edgeimpulse-arduino
 
 
 
