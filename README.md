@@ -45,6 +45,11 @@ This might be a good starting point for my viewers.
 
 https://docs.arduino.cc/tutorials/uno-q/user-manual/
 
+
+
+# Using OBS on the UNOQ to video Object detection
+
+
 https://www.circuito.io/blog/arduino-uno-pinout/
 
 
