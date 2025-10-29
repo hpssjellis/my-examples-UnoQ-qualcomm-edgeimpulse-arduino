@@ -107,4 +107,8 @@ https://docs.arduino.cc/tutorials/uno-q/update-image/
 
 
 
+https://github.com/user-attachments/assets/824c8d8e-be02-41a9-a3b8-f9f3ad9368f2
+
+
+
 
