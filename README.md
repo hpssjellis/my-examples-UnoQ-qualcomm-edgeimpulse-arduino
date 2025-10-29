@@ -6,7 +6,7 @@ Started Oct 24, 2025
 
 I am trying to decide if I should make a maker100 Course based on the UnoQ. My curriculum is [here](https://github.com/hpssjellis/maker100-curriculum) and the PortentaH7 Original Maker100 Course is [here](https://github.com/hpssjellis/maker100)
 
-This page as a website if github scares you [here](https://hpssjellis.github.io/my-examples-qualcomm-edgeimpulse-arduino-unoQ/)
+This page as a website if github scares you [here](https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/)
 
 ## UnoQ playlist
 
