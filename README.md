@@ -10,7 +10,16 @@ This page as a website if github scares you [here](https://hpssjellis.github.io/
 
 ## UnoQ playlist
 
-https://www.youtube.com/playlist?list=PL57Dnr1H_egsOqQUOiIBio2zXN2rE0QgJ
+
+
+
+
+[https://www.youtube.com/playlist?list=PL57Dnr1H_egsOqQUOiIBio2zXN2rE0QgJ
+![UnoQ-PlayList Jeremy Ellis](https://img.youtube.com/vi/NTYGkRdZ5Yw/0.jpg)](https://www.youtube.com/playlist?list=PL57Dnr1H_egsOqQUOiIBio2zXN2rE0QgJ)
+
+
+
+
 
 
 
