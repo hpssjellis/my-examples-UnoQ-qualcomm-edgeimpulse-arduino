@@ -1,5 +1,4 @@
 import time
-import os
 from datetime import datetime
 
 # --- Configuration: Linux File Paths for Onboard LEDs ---
@@ -15,53 +14,45 @@ def mySetLedBrightness(myLedFilePath, myValue):
     except Exception as myError:
         print(f"Error controlling LED at {myLedFilePath}: {myError}. Check permissions.")
 
-# --- LED State Class ---
-class LEDController:
-    def __init__(self, ledPath, period):
-        self.ledPath = ledPath
-        self.period = period  # Time in seconds for one complete cycle (on + off)
-        self.lastToggle = time.time()
-        self.state = False  # False = OFF, True = ON
-    
-    def update(self, currentTime):
-        """Non-blocking update - checks if it's time to toggle the LED"""
-        if currentTime - self.lastToggle >= self.period / 2:
-            self.state = not self.state
-            mySetLedBrightness(self.ledPath, 255 if self.state else 0)
-            self.lastToggle = currentTime
-            return True  # LED was toggled
-        return False  # No toggle this cycle
+def timestamp():
+    """Returns current timestamp string"""
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
 def main():
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] hello")
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting non-blocking LED flash sequence...")
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Press Ctrl+C to stop")
+    print(f"[{timestamp()}] hello")
+    print(f"[{timestamp()}] Starting LED flash sequence...")
+    print(f"[{timestamp()}] Press Ctrl+C to stop")
     
-    # Create LED controllers with different periods
-    blueLED = LEDController(myLed1BluePath, period=1.0)   # 1 second cycle (0.5s on, 0.5s off)
-    greenLED = LEDController(myLed2GreenPath, period=2.0)  # 2 second cycle (1s on, 1s off)
+    blueState = False
+    greenState = False
+    blueLastToggle = time.time()
+    greenLastToggle = time.time()
     
     try:
         while True:
-            currentTime = time.time()
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            now = time.time()
             
-            # Update each LED independently
-            if blueLED.update(currentTime):
-                print(f"[{timestamp}] Blue LED: {'ON' if blueLED.state else 'OFF'}")
+            # Toggle blue LED every 0.5 seconds (1 second period)
+            if now - blueLastToggle >= 0.5:
+                blueState = not blueState
+                mySetLedBrightness(myLed1BluePath, 255 if blueState else 0)
+                print(f"[{timestamp()}] Blue LED: {'ON' if blueState else 'OFF'}")
+                blueLastToggle = now
             
-            if greenLED.update(currentTime):
-                print(f"[{timestamp}] Green LED: {'ON' if greenLED.state else 'OFF'}")
+            # Toggle green LED every 1 second (2 second period)
+            if now - greenLastToggle >= 1.0:
+                greenState = not greenState
+                mySetLedBrightness(myLed2GreenPath, 255 if greenState else 0)
+                print(f"[{timestamp()}] Green LED: {'ON' if greenState else 'OFF'}")
+                greenLastToggle = now
             
-            # Small sleep to prevent CPU spinning
-            time.sleep(0.01)
+            time.sleep(0.01)  # Small sleep to prevent CPU spinning
     
     except KeyboardInterrupt:
-        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Stopping LED flash sequence...")
-        # Turn off both LEDs on exit
+        print(f"\n[{timestamp()}] Stopping LED flash sequence...")
         mySetLedBrightness(myLed1BluePath, 0)
         mySetLedBrightness(myLed2GreenPath, 0)
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] LEDs turned off. Goodbye!")
+        print(f"[{timestamp()}] LEDs turned off. Goodbye!")
 
 if __name__ == "__main__":
     main()
