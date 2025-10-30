@@ -92,6 +92,7 @@ https://docs.arduino.cc/resources/pinouts/ABX00162-full-pinout.pdf
 
 <img width="1504" height="1517" alt="image" src="https://github.com/user-attachments/assets/43d5baa8-1867-463f-8fed-f9c18da66bb8" />
 
+<img width="794" height="832" alt="image" src="https://github.com/user-attachments/assets/e940c7c4-9f9b-4622-9aee-93227ff68006" />
 
 
 
@@ -113,6 +114,8 @@ https://docs.arduino.cc/tutorials/uno-q/update-image/
 
 
 https://github.com/user-attachments/assets/824c8d8e-be02-41a9-a3b8-f9f3ad9368f2
+
+
 
 
 
