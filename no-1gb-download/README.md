@@ -11,3 +11,11 @@ To kill the error of the chromium process
 rm -rf ~/.config/chromium/Singleton*
 
 Then the webpages start to work again. EdgeImpulse vision models shoud run. may have to reload chromium with ```localhost:7000```
+
+
+
+In Applications load synaptic package manager
+
+search for kazam and mark it for install
+
+then edit apply changes
