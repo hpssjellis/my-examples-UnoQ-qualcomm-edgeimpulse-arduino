@@ -49,6 +49,14 @@ https://docs.arduino.cc/tutorials/uno-q/user-manual/
 
 # Using OBS on the UNOQ to video Object detection
 
+```
+sudo apt update
+sudo apt install obs-studio
+BGL_ALWAYS_SOFTWARE=1 obs
+
+reduce the video resolution say 768x432, 854x480, 960x540
+```
+
 
 https://www.circuito.io/blog/arduino-uno-pinout/
 
