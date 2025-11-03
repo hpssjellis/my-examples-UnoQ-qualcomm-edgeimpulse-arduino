@@ -120,3 +120,19 @@ https://github.com/user-attachments/assets/824c8d8e-be02-41a9-a3b8-f9f3ad9368f2
 
 
 
+$13.99 USB to TTL 
+
+https://www.amazon.com/DSD-TECH-SH-U09C5-Converter-Support/dp/B07WX2DSVB/ref=sr_1_3
+
+I bought this to test why the serial monitor was not working and I thought I would need the 1.8V ability, but it was a simple GND, TX, TR and the setting set for 3.3V so I could have used any of my other USB to TTL devices.
+This allowed Serial1 to work, but strangely it was comming through as Serial. So I am not really sure why this didn't show up in the Serial Monitor on AppLab. I will research some more.
+
+
+
+
+<img width="960" height="405" alt="image" src="https://github.com/user-attachments/assets/c9500993-e9e0-40d7-81a8-f2e3e02eeffa" />
+
+
+
+
+
