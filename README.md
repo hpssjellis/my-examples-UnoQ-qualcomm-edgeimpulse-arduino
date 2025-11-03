@@ -55,6 +55,7 @@ sudo apt install obs-studio
 BGL_ALWAYS_SOFTWARE=1 obs
 
 reduce the video resolution say 768x432, 854x480, 960x540
+Works on my first unoQ, doesn't work on my latest.
 ```
 
 
