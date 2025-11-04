@@ -1,0 +1,60 @@
+name: Multi-Model Detector
+description: "Configuration file for various Edge Impulse model types (UNO Q)"
+ports:
+- arduino:web_ui: {}
+icon: 🤖
+
+bricks:
+
+# =========================================================================
+# === ACTIVE BRICK: OBJECT DETECTION (using EI_OBJ_DETECTION_MODEL) ===
+# =========================================================================
+- arduino:video_object_detection: {
+    variables: {
+      EI_OBJ_DETECTION_MODEL: /home/arduino/.arduino-bricks/ei-models/<your object detection model name>.eim
+    }
+  }
+
+# =========================================================================
+# === COMMENTED BRICKS (Uncomment one block to switch models) ===
+# =========================================================================
+
+# --- 1. Generic Classification (Image/Sensor) ---
+# Requires: video_classification brick (often used for visual classification)
+#- arduino:video_classification: {
+#    variables: {
+#      EI_CLASSIFICATION_MODEL: /home/arduino/.arduino-bricks/ei-models/<your classification model name>.eim
+#    }
+#  }
+
+# --- 2. Keyword Spotting (Audio) ---
+# Requires: keyword_spotting brick
+#- arduino:keyword_spotting: {
+#    variables: {
+#      EI_KEYWORD_SPOTTING_MODEL: /home/arduino/.arduino-bricks/ei-models/<your keyword spotting model name>.eim
+#    }
+#  }
+
+# --- 3. Audio Classification ---
+# Requires: audio_classification brick
+#- arduino:audio_classification: {
+#    variables: {
+#      EI_AUDIO_CLASSIFICATION_MODEL: /home/arduino/.arduino-bricks/ei-models/<your audio classification model name>.eim
+#    }
+#  }
+
+# --- 4. Motion Detection ---
+# Requires: motion_detection brick (for IMU/accelerometer models)
+#- arduino:motion_detection: {
+#    variables: {
+#      EI_MOTION_DETECTION_MODEL: /home/arduino/.arduino-bricks/ei-models/<your motion detection model name>.eim
+#    }
+#  }
+
+# --- 5. Video Anomaly Detection ---
+# Requires: video_anomaly_detection brick
+#- arduino:video_anomaly_detection: {
+#    variables: {
+#      EI_V_ANOMALY_DETECTION_MODEL: /home/arduino/.arduino-bricks/ei-models/<your video anomaly model name>.eim
+#    }
+#  }
