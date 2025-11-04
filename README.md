@@ -54,6 +54,18 @@ sudo apt update
 sudo apt install obs-studio
 BGL_ALWAYS_SOFTWARE=1 obs
 
+
+You might want to make a bash file to loa the main command.
+
+nano run-obs.sh
+#!/bin/bash
+BGL_ALWAYS_SOFTWARE=1 obs
+cntl-X
+
+chmod +x run-obs.sh
+
+
+
 reduce the video resolution say 768x432, 854x480, 960x540
 Works on my first unoQ, doesn't work on my latest.
 ```
