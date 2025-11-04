@@ -1,4 +1,11 @@
 
+Chromium acting up 
+
+```
+To kill the error of the chromium process
+
+rm -rf ~/.config/chromium/Singleton*
+```
 
 
 
