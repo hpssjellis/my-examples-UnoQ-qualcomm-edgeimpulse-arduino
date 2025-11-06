@@ -1,14 +1,29 @@
-#include <Arduino.h> // Only needed by https://platformio.org/
+#include <Arduino_RouterBridge.h>
+#define Serial Monitor
+
+unsigned long t;
+String input;
 
 void setup() {
-  Serial.begin(9600);   // not 115200
-  pinMode(LED4_B, OUTPUT);  
+  Serial.begin(9600);
+  pinMode(LED3_G, OUTPUT);
+  t = millis();
+  Serial.println("Serial as the monitor using the python bridge");
 }
 
 void loop() {
-  Serial.println("Serial print works on the UnoQ USB-TTL TX RX 3.3V. Here is A0 reading: " + String(analogRead(A0)) );
-  digitalWrite(LED4_B, LOW);   // internal LED LOW = on for onboard LED
-  delay(1000);                      // wait for a second
-  digitalWrite(LED4_B, HIGH);  
-  delay(3000);               
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n') {
+      Serial.print(input);
+      input = "";
+    } else input += c;
+  }
+  if (millis() - t >= 1000) {
+    digitalWrite(LED3_G, !digitalRead(LED3_G));
+    t = millis();
+    if (digitalRead(LED3_G) == LOW){
+      Serial.print("LED3_G is on and LOW, Type and send something");
+    }
+  }
 }
