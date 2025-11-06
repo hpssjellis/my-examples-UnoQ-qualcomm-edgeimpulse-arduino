@@ -7,9 +7,63 @@ sudo apt update
 ```
 ls
 ```
+
+```
+hostname
+```
 ```
 hostname -I
 ```
 ```
 hostnamectl
 ```
+
+Check all COM ports
+```
+ls /dev/tty*
+```
+
+```
+sudo usermod -aG dialout arduino
+```
+
+
+```
+minicom -b 9600 -D /dev/ttyS0
+
+```
+
+
+
+Check GUI
+
+```
+echo $XDG_CURRENT_DESKTOP
+```
+
+answer is XXFCE
+
+So when searching for commands tell it you are using XFCE
+
+
+
+## Power and sleep
+
+Super irritating that it shuts down after 10 minutes and needs a login password.
+
+Applications Menu > Settings > Power Manager.
+
+or Application finder --> Power Manager
+
+--> display eitherr turn it off or crank them to 60 minutes, both sleep and switch-off
+
+
+
+
+## Installing software
+
+
+
+Synaptic Package Manager is installed just find it, but int=stalling is a bit confusing, try this website for help
+
+https://www.debian.org/distrib/packages
