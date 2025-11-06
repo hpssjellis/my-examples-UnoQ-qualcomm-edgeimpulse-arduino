@@ -8,7 +8,7 @@ sudo apt update
 ls
 ```
 ```
-hostname -T
+hostname -I
 ```
 ```
 hostnamectl
