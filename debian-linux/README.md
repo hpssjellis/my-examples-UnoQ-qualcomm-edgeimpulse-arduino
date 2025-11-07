@@ -81,3 +81,12 @@ env LIBGL_ALWAYS_SOFTWARE=1 obs
 ```
 
 then reduce resolution and fps
+
+
+The xfce4-terminal is horrible for copy paste lets try installing terminator
+
+```
+sudo apt install terminator
+
+```
+
