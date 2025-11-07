@@ -35,6 +35,36 @@ Option  Purpose
 :5900
 
 
+so make a bash file to keep this command
+
+```
+nano run-vnc.sh
+```
+
+```
+#!/bin/bash
+x11vnc -display :0 -rfbauth ~/.vnc/passwd -forever -noxdamage
+```
+
+
+Then make it runnable
+```
+chmod +x run-vnc.sh
+```
+
+And try to run it after a reboot and then test with a viewer.
+
+```
+./run-vnc.sh
+```
+
+-----
+
+I have not got this next part working yet, but will be needed for headless vnc ability
+
+I am just trying to make good videos, so this is not really needed yet for me.
+
+
 ## as a service for startup
 
 ### Set a new, VNC-specific password and save it to /etc/x11vnc.pass
