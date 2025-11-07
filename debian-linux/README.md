@@ -77,7 +77,7 @@ randomly works. does not liek the graphics adaptor but reducing resolution etc h
 ```
 sudo apt update
 sudo apt install obs-studio
-BGL_ALWAYS_SOFTWARE=1 obs
+env LIBGL_ALWAYS_SOFTWARE=1 obs
 ```
 
 then reduce resolution and fps
