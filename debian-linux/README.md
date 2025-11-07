@@ -67,3 +67,17 @@ or Application finder --> Power Manager
 Synaptic Package Manager is installed just find it, but int=stalling is a bit confusing, try this website for help
 
 https://www.debian.org/distrib/packages
+
+
+
+#W# obs-studio
+
+randomly works. does not liek the graphics adaptor but reducing resolution etc helps
+
+```
+sudo apt update
+sudo apt install obs-studio
+BGL_ALWAYS_SOFTWARE=1 obs
+```
+
+then reduce resolution and fps
