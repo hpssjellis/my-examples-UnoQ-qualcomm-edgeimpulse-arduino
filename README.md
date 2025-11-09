@@ -8,6 +8,8 @@ I am trying to decide if I should make a maker100 Course based on the UnoQ. My c
 
 This page as a website if github scares you [here](https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/)
 
+The web index for this site is <a href="https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/public/index.html">here</a>. It has a webcam movie maker for if you can direct the UnoQ output to a computer as a video input.<br>
+
 ## UnoQ playlist
 
 
