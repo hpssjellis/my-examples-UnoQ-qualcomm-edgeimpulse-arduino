@@ -24,12 +24,17 @@
     <!-- Display area for the recorded video -->
     <video id="myRecordedVideo" controls style="display: none; border: 2px solid green; max-width: 90%; margin-bottom: 20px;"></video>
 
-    <!-- Controls Container -->
-    <div id="myControls" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+    <!-- Controls Container: Now set to display items horizontally in a single line -->
+    <div id="myControls" style="display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px;">
         
         <!-- Camera Selection Dropdown -->
         <select id="myCameraSelect" style="padding: 10px; border: 1px solid #007bff; border-radius: 5px;" onchange="myChangeCamera(this.value)">
             <option>Loading Cameras...</option>
+        </select>
+        
+        <!-- Resolution Selection Dropdown (NEW) -->
+        <select id="myResolutionSelect" style="padding: 10px; border: 1px solid #ffc107; border-radius: 5px;" onchange="myChangeCamera(myCameraSelect.value)">
+            <option>Loading Resolutions...</option>
         </select>
         
         <!-- Format Selection Dropdown -->
@@ -57,6 +62,7 @@
         const myVideoCanvas = document.getElementById('myVideoCanvas');
         const myRecordedVideo = document.getElementById('myRecordedVideo');
         const myCameraSelect = document.getElementById('myCameraSelect');
+        const myResolutionSelect = document.getElementById('myResolutionSelect'); // NEW ELEMENT
         const myFormatSelect = document.getElementById('myFormatSelect');
         const myPhotoButton = document.getElementById('myPhotoButton');
         const myRecordButton = document.getElementById('myRecordButton');
@@ -69,6 +75,28 @@
         let myIsRecording = false;
 
         // --- 2. Setup Functions ---
+        
+        /**
+         * Loads standard video resolutions into the select box.
+         */
+        function myLoadResolutionPresets() {
+            const myResolutionPresets = [
+                { width: 1280, height: 720, name: 'HD (720p)' },
+                { width: 640, height: 480, name: 'VGA (480p)' },
+                { width: 320, height: 240, name: 'QVGA (240p)' },
+                { width: 1920, height: 1080, name: 'Full HD (1080p)' } // High Resolution option
+            ];
+            
+            myResolutionSelect.innerHTML = '';
+            for (const preset of myResolutionPresets) {
+                const myOption = document.createElement('option');
+                myOption.value = `${preset.width}x${preset.height}`;
+                myOption.textContent = preset.name;
+                myResolutionSelect.appendChild(myOption);
+            }
+            // Set 640x480 as the initial selection
+            myResolutionSelect.value = '640x480'; 
+        }
 
         /**
          * Checks and loads supported video/audio recording formats into the select box.
@@ -79,9 +107,9 @@
                 { mime: 'video/webm; codecs=vp9,opus', name: 'WebM (High Quality)' },
                 { mime: 'video/webm; codecs=vp8,opus', name: 'WebM (Standard)' },
                 { mime: 'video/webm', name: 'WebM (Default)' },
-                // Note: MP4/H.264 support is inconsistent and browser-dependent in MediaRecorder.
-                // We check it, but WebM is the standard for guaranteed browser recording.
-                { mime: 'video/mp4', name: 'MP4 (If Supported)' } 
+                // Added a common MP4 format, but WebM is the standard for guaranteed browser recording.
+                { mime: 'video/mp4; codecs=avc1.42001E,mp4a.40.2', name: 'MP4 (AVC/AAC - If Supported)' }, 
+                { mime: 'video/mp4', name: 'MP4 (Generic - If Supported)' } 
             ];
 
             myFormatSelect.innerHTML = '';
@@ -164,16 +192,21 @@
         }
 
         /**
-         * Starts a new video stream based on the selected device ID.
+         * Starts a new video stream based on the selected device ID and resolution.
          * @param {string} myDeviceId The ID of the camera to use.
          */
         async function myChangeCamera(myDeviceId) {
             myStopCurrentStream(); // Stop the previous camera stream
-
+            
+            // Get selected resolution
+            const [myWidth, myHeight] = myResolutionSelect.value.split('x').map(Number);
+            
             const myConstraints = {
                 audio: true, // Always request audio for video recording
                 video: {
-                    deviceId: myDeviceId ? { exact: myDeviceId } : undefined 
+                    deviceId: myDeviceId ? { exact: myDeviceId } : undefined,
+                    width: { ideal: myWidth },     // Apply width constraint
+                    height: { ideal: myHeight }    // Apply height constraint
                 }
             };
 
@@ -181,6 +214,12 @@
                 // Get the new stream
                 myCurrentStream = await navigator.mediaDevices.getUserMedia(myConstraints);
                 myLiveStreamVideo.srcObject = myCurrentStream;
+                
+                // IMPORTANT: Mute the video element to prevent audio loopback/echo.
+                myLiveStreamVideo.muted = true;
+                
+                // Audio Confirmation: Log how many audio tracks were successfully captured.
+                console.log(`Audio tracks captured: ${myCurrentStream.getAudioTracks().length}`); 
                 
                 // When the video starts playing, start the canvas drawing loop
                 myLiveStreamVideo.onloadedmetadata = () => {
@@ -196,8 +235,8 @@
                 };
 
             } catch (error) {
-                console.error("Error switching camera:", error);
-                alert("Could not start camera with ID: " + myDeviceId);
+                console.error("Error switching camera or resolution:", error);
+                alert("Could not start camera with ID: " + myDeviceId + ". Try a lower resolution.");
                 myPhotoButton.disabled = true;
                 myRecordButton.disabled = true;
             }
@@ -314,6 +353,8 @@
          */
         function myHandleRecordingStop() {
             // Combine all recorded chunks into a single Blob (the video file)
+            // Using myMediaRecorder.mimeType ensures we use the exact format negotiated by the browser, 
+            // which helps ensure the audio track is correctly included in the final file.
             const myVideoBlob = new Blob(myRecordedChunks, { type: myMediaRecorder.mimeType });
             
             // Create a temporary URL for the Blob
@@ -325,7 +366,7 @@
 
             // Update the download link
             myDownloadLink.href = myVideoUrl;
-            // The file extension is often guessed based on the MIME type
+            // The file extension is guessed based on the MIME type
             myDownloadLink.download = 'webcam_recording_' + Date.now() + (myMediaRecorder.mimeType.includes('mp4') ? '.mp4' : '.webm'); 
             myDownloadLink.style.display = 'inline';
         }
@@ -333,6 +374,7 @@
         // --- 7. Initialization on Page Load ---
 
         // 1. Load supported recording formats
+        myLoadResolutionPresets(); // NEW: Load resolutions
         myLoadSupportedFormats();
         
         // 2. Load available cameras and start the first one
