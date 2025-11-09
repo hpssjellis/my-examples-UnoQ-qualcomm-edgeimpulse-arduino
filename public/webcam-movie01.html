@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Webcam and Recorder</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; margin-top: 20px;">
+    
+    <h1 style="color: #007bff;">Webcam Capture and Recorder</h1>
+
+    <!-- 
+        1. Video Element: Used to hold the raw stream from the webcam. 
+           It must be present but can be hidden or used for drawing to the canvas.
+    -->
+    <video id="myLiveStreamVideo" autoplay playsinline style="display: none;"></video>
+
+    <!-- 
+        2. Canvas Element: This is where the user sees the live video feed. 
+           We draw the video element's content onto this for better control.
+    -->
+    <canvas id="myVideoCanvas" width="640" height="480" style="border: 2px solid #ccc; max-width: 90%; margin-bottom: 20px;"></canvas>
+
+    <!-- Display area for the recorded video -->
+    <video id="myRecordedVideo" controls style="display: none; border: 2px solid green; max-width: 90%; margin-bottom: 20px;"></video>
+
+    <!-- Controls Container -->
+    <div id="myControls" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        
+        <!-- Camera Selection Dropdown -->
+        <select id="myCameraSelect" style="padding: 10px; border: 1px solid #007bff; border-radius: 5px;" onchange="myChangeCamera(this.value)">
+            <option>Loading Cameras...</option>
+        </select>
+        
+        <!-- Format Selection Dropdown -->
+        <select id="myFormatSelect" style="padding: 10px; border: 1px solid #28a745; border-radius: 5px;" disabled>
+            <option>Loading Formats...</option>
+        </select>
+        
+        <!-- Button to Take a Photo -->
+        <button id="myPhotoButton" onclick="myTakePhoto()" style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
+            📸 Take Photo
+        </button>
+
+        <!-- Button to Start/Stop Recording -->
+        <button id="myRecordButton" onclick="myToggleRecording()" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
+            🔴 Start Recording
+        </button>
+        
+        <!-- Download Link for recorded video (initially hidden) -->
+        <a id="myDownloadLink" style="display: none; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Download Video</a>
+    </div>
+
+    <script>
+        // --- 1. Global Variables (myVariables) ---
+        const myLiveStreamVideo = document.getElementById('myLiveStreamVideo');
+        const myVideoCanvas = document.getElementById('myVideoCanvas');
+        const myRecordedVideo = document.getElementById('myRecordedVideo');
+        const myCameraSelect = document.getElementById('myCameraSelect');
+        const myFormatSelect = document.getElementById('myFormatSelect');
+        const myPhotoButton = document.getElementById('myPhotoButton');
+        const myRecordButton = document.getElementById('myRecordButton');
+        const myDownloadLink = document.getElementById('myDownloadLink');
+        const myCanvasContext = myVideoCanvas.getContext('2d');
+        
+        let myCurrentStream = null;
+        let myMediaRecorder = null;
+        let myRecordedChunks = [];
+        let myIsRecording = false;
+
+        // --- 2. Setup Functions ---
+
+        /**
+         * Checks and loads supported video/audio recording formats into the select box.
+         */
+        function myLoadSupportedFormats() {
+            // Priority list of common MIME types (Container; Codec)
+            const myFormatsToCheck = [
+                { mime: 'video/webm; codecs=vp9,opus', name: 'WebM (High Quality)' },
+                { mime: 'video/webm; codecs=vp8,opus', name: 'WebM (Standard)' },
+                { mime: 'video/webm', name: 'WebM (Default)' },
+                // Note: MP4/H.264 support is inconsistent and browser-dependent in MediaRecorder.
+                // We check it, but WebM is the standard for guaranteed browser recording.
+                { mime: 'video/mp4', name: 'MP4 (If Supported)' } 
+            ];
+
+            myFormatSelect.innerHTML = '';
+            let mySupportedCount = 0;
+
+            for (const format of myFormatsToCheck) {
+                if (MediaRecorder.isTypeSupported(format.mime)) {
+                    const myOption = document.createElement('option');
+                    myOption.value = format.mime;
+                    myOption.textContent = format.name;
+                    myFormatSelect.appendChild(myOption);
+                    mySupportedCount++;
+                }
+            }
+
+            if (mySupportedCount > 0) {
+                myFormatSelect.disabled = false;
+            } else {
+                myFormatSelect.innerHTML = '<option>No Recording Formats Supported</option>';
+            }
+        }
+
+        /**
+         * Finds all connected video input devices (webcams) and populates the select box.
+         */
+        async function myGetCameras() {
+            myCameraSelect.innerHTML = '<option>Searching...</option>';
+            try {
+                // Request a stream first to get permission, which allows enumeration of device labels.
+                await myRequestMediaPermission(); 
+                
+                const myDevices = await navigator.mediaDevices.enumerateDevices();
+                myCameraSelect.innerHTML = ''; // Clear the "Searching" message
+                let myCameraCount = 0;
+
+                for (const myDevice of myDevices) {
+                    if (myDevice.kind === 'videoinput') {
+                        const myOption = document.createElement('option');
+                        myOption.value = myDevice.deviceId;
+                        // Use default label if user hasn't granted permission yet
+                        myOption.textContent = myDevice.label || `Camera ${++myCameraCount}`; 
+                        myCameraSelect.appendChild(myOption);
+                        myCameraCount++;
+                    }
+                }
+
+                if (myCameraCount > 0) {
+                    myChangeCamera(myCameraSelect.value); // Auto-start the first camera
+                } else {
+                    myCameraSelect.innerHTML = '<option>No Cameras Found</option>';
+                }
+
+            } catch (error) {
+                console.error("Error enumerating devices:", error);
+                myCameraSelect.innerHTML = '<option>Permission Denied</option>';
+                alert("Please grant camera access to use this page.");
+            }
+        }
+        
+        /**
+         * Requests media permission. This is necessary for enumerateDevices to get labels.
+         */
+        async function myRequestMediaPermission() {
+             // Request stream (but don't assign it yet) to force permission prompt
+            const myTempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            // Stop tracks immediately after obtaining permission
+            myTempStream.getTracks().forEach(track => track.stop());
+            return myTempStream;
+        }
+
+        // --- 3. Stream Control Functions ---
+
+        /**
+         * Stops the current stream tracks (if any)
+         */
+        function myStopCurrentStream() {
+            if (myCurrentStream) {
+                myCurrentStream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        /**
+         * Starts a new video stream based on the selected device ID.
+         * @param {string} myDeviceId The ID of the camera to use.
+         */
+        async function myChangeCamera(myDeviceId) {
+            myStopCurrentStream(); // Stop the previous camera stream
+
+            const myConstraints = {
+                audio: true, // Always request audio for video recording
+                video: {
+                    deviceId: myDeviceId ? { exact: myDeviceId } : undefined 
+                }
+            };
+
+            try {
+                // Get the new stream
+                myCurrentStream = await navigator.mediaDevices.getUserMedia(myConstraints);
+                myLiveStreamVideo.srcObject = myCurrentStream;
+                
+                // IMPORTANT: Mute the video element to prevent audio loopback/echo.
+                // This stops the user from hearing their own mic input through the speakers,
+                // but the mic track is still active in the stream for the MediaRecorder.
+                myLiveStreamVideo.muted = true;
+                
+                // When the video starts playing, start the canvas drawing loop
+                myLiveStreamVideo.onloadedmetadata = () => {
+                    myLiveStreamVideo.play();
+                    // Set canvas size to match the stream resolution
+                    myVideoCanvas.width = myLiveStreamVideo.videoWidth;
+                    myVideoCanvas.height = myLiveStreamVideo.videoHeight;
+                    myDrawLoop(); 
+                    
+                    // Enable control buttons
+                    myPhotoButton.disabled = false;
+                    myRecordButton.disabled = false;
+                };
+
+            } catch (error) {
+                console.error("Error switching camera:", error);
+                alert("Could not start camera with ID: " + myDeviceId);
+                myPhotoButton.disabled = true;
+                myRecordButton.disabled = true;
+            }
+        }
+
+        // --- 4. Canvas Drawing Loop ---
+
+        /**
+         * Continuously draws the video frame onto the canvas.
+         */
+        function myDrawLoop() {
+            if (myLiveStreamVideo.paused || myLiveStreamVideo.ended) return;
+
+            // Draw the current video frame onto the canvas
+            myCanvasContext.drawImage(myLiveStreamVideo, 0, 0, myVideoCanvas.width, myVideoCanvas.height);
+            
+            // Loop this function for smooth animation
+            requestAnimationFrame(myDrawLoop);
+        }
+
+
+        // --- 5. Photo Capture Function ---
+
+        /**
+         * Captures the current canvas content and downloads it as an image.
+         */
+        function myTakePhoto() {
+            // Get the image data URL from the canvas
+            const myImageDataUrl = myVideoCanvas.toDataURL('image/png');
+            
+            // Create a temporary link element to trigger the download
+            const myLink = document.createElement('a');
+            myLink.href = myImageDataUrl;
+            myLink.download = 'webcam_photo_' + Date.now() + '.png';
+            
+            // Simulate a click on the link to start the download
+            document.body.appendChild(myLink);
+            myLink.click();
+            document.body.removeChild(myLink); // Clean up the link element
+
+            // Simple visual feedback
+            myVideoCanvas.style.border = '4px solid #ffc107';
+            setTimeout(() => { myVideoCanvas.style.border = '2px solid #ccc'; }, 200);
+        }
+
+        // --- 6. Video Recording Functions ---
+
+        /**
+         * Starts or stops the video recording process.
+         */
+        function myToggleRecording() {
+            if (myIsRecording) {
+                myStopRecording();
+            } else {
+                myStartRecording();
+            }
+        }
+
+        /**
+         * Starts the video recording process using the MediaRecorder API.
+         */
+        function myStartRecording() {
+            if (!myCurrentStream) {
+                alert("Please start the camera first.");
+                return;
+            }
+
+            // Get the selected MIME type from the dropdown
+            const myMimeType = myFormatSelect.value;
+            
+            // Initialize the MediaRecorder
+            myMediaRecorder = new MediaRecorder(myCurrentStream, { mimeType: myMimeType });
+            myRecordedChunks = []; // Reset chunks array
+
+            // Event handler for when data chunks are available
+            myMediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    myRecordedChunks.push(event.data);
+                }
+            };
+
+            // Event handler for when recording stops (to process the final video)
+            myMediaRecorder.onstop = myHandleRecordingStop;
+
+            // Start recording
+            myMediaRecorder.start();
+            myIsRecording = true;
+
+            // Update UI
+            myRecordButton.innerText = '⏹️ Stop Recording';
+            myRecordButton.style.backgroundColor = '#007bff';
+            myVideoCanvas.style.border = '4px dashed #dc3545'; // Recording cue
+            myRecordedVideo.style.display = 'none';
+            myDownloadLink.style.display = 'none';
+        }
+
+        /**
+         * Stops the video recording and processes the final video Blob.
+         */
+        function myStopRecording() {
+            if (myMediaRecorder && myMediaRecorder.state !== 'inactive') {
+                myMediaRecorder.stop();
+            }
+            myIsRecording = false;
+
+            // Update UI
+            myRecordButton.innerText = '🔴 Start Recording';
+            myRecordButton.style.backgroundColor = '#dc3545';
+            myVideoCanvas.style.border = '2px solid #ccc'; // Reset cue
+        }
+
+        /**
+         * Handler to process the recorded data when the MediaRecorder stops.
+         */
+        function myHandleRecordingStop() {
+            // Combine all recorded chunks into a single Blob (the video file)
+            const myVideoBlob = new Blob(myRecordedChunks, { type: myMediaRecorder.mimeType });
+            
+            // Create a temporary URL for the Blob
+            const myVideoUrl = URL.createObjectURL(myVideoBlob);
+
+            // Display the recorded video in the dedicated video element
+            myRecordedVideo.src = myVideoUrl;
+            myRecordedVideo.style.display = 'block';
+
+            // Update the download link
+            myDownloadLink.href = myVideoUrl;
+            // The file extension is often guessed based on the MIME type
+            myDownloadLink.download = 'webcam_recording_' + Date.now() + (myMediaRecorder.mimeType.includes('mp4') ? '.mp4' : '.webm'); 
+            myDownloadLink.style.display = 'inline';
+        }
+
+        // --- 7. Initialization on Page Load ---
+
+        // 1. Load supported recording formats
+        myLoadSupportedFormats();
+        
+        // 2. Load available cameras and start the first one
+        myGetCameras();
+
+        // 3. Simple error function (for students)
+        function alert(message) {
+            console.error("APP ERROR: " + message);
+        }
+
+    </script>
+</body>
+</html>
