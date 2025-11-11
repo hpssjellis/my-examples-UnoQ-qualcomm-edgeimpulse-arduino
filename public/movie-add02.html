@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Video Combiner (FFmpeg)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/util.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js"></script>
+    <style>
+        /* Minimal inline CSS */
+        body { font-family: sans-serif; text-align: center; max-width: 600px; margin: auto; padding: 20px; }
+        h2 { color: #007bff; }
+        .myControlGroup { margin-bottom: 15px; border: 1px solid #ccc; padding: 10px; border-radius: 5px; text-align: left; }
+        button { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; margin-top: 15px; }
+        .myStatus { margin-top: 20px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <h2>Combine Two Full Movies</h2>
+
+    <div class="myControlGroup">
+        <label for="myVideoOneInput">Select First Movie:</label>
+        <input type="file" id="myVideoOneInput" accept="video/mp4,video/webm" onchange="myCheckReady()" />
+    </div>
+
+    <div class="myControlGroup">
+        <label for="myVideoTwoInput">Select Second Movie:</label>
+        <input type="file" id="myVideoTwoInput" accept="video/mp4,video/webm" onchange="myCheckReady()" />
+    </div>
+
+    <button onclick="myCombineAndSaveMovies()" id="myCombineButton" disabled>Combine and Save Movie</button>
+
+    <div class="myStatus" id="myStatusMessage">Initializing...</div>
+
+    <script>
+        // --- 1. Global Variables & FFmpeg Setup (myVariables) ---
+        
+        // Correct way to instantiate the FFmpeg class for version 0.12.x
+        const myFFmpeg = new FFmpeg(); 
+        
+        const myStatusDiv = document.getElementById('myStatusMessage');
+        const myVideoOneInput = document.getElementById('myVideoOneInput');
+        const myVideoTwoInput = document.getElementById('myVideoTwoInput');
+        const myCombineButton = document.getElementById('myCombineButton');
+
+        // Define the base URL for the core files (must match the version)
+        const myCoreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/umd';
+
+
+        /**
+         * Converts a user-selected File object into a buffer array FFmpeg can use.
+         * @param {File} myFile The file object to read.
+         * @returns {Promise<Uint8Array>} The file data as a Uint8Array.
+         */
+        async function myGetFileBuffer(myFile) {
+            const myFileArrayBuffer = await myFile.arrayBuffer();
+            return new Uint8Array(myFileArrayBuffer);
+        }
+
+        /**
+         * Checks if both files are selected and enables the combine button.
+         */
+        function myCheckReady() {
+            if (myVideoOneInput.files.length > 0 && myVideoTwoInput.files.length > 0 && myFFmpeg.loaded) {
+                myCombineButton.disabled = false;
+                myStatusDiv.innerText = 'Ready to combine the two selected videos.';
+            } else {
+                myCombineButton.disabled = true;
+                if (!myFFmpeg.loaded) {
+                     myStatusDiv.innerText = 'FFmpeg is still loading. Please wait.';
+                }
+            }
+        }
+
+        /**
+         * Main function to combine the videos using FFmpeg in WebAssembly.
+         * Uses async/await as preferred.
+         */
+        async function myCombineAndSaveMovies() {
+            const myFileOne = myVideoOneInput.files[0];
+            const myFileTwo = myVideoTwoInput.files[0];
+
+            if (!myFileOne || !myFileTwo) {
+                myStatusDiv.innerText = 'Error: Please select both video files.';
+                return;
+            }
+            
+            myCombineButton.disabled = true;
+            
+            // 2. Read Files and Write to Virtual FS
+            const myFileNameOne = 'input1.mp4';
+            const myFileNameTwo = 'input2.mp4';
+            const myOutputFileName = 'combined_movie.mp4';
+            const myListFileName = 'concat_list.txt';
+
+            myStatusDiv.innerText = 'Processing videos...';
+            try {
+                // Read and write the files to the FFmpeg virtual file system
+                myFFmpeg.FS('writeFile', myFileNameOne, await myGetFileBuffer(myFileOne));
+                myFFmpeg.FS('writeFile', myFileNameTwo, await myGetFileBuffer(myFileTwo));
+
+                // Create a list file for the concat demuxer
+                const myListContent = `file '${myFileNameOne}'\nfile '${myFileNameTwo}'`;
+                myFFmpeg.FS('writeFile', myListFileName, myListContent);
+
+            } catch (error) {
+                myStatusDiv.innerText = `Error writing files to virtual FS: ${error.message}`;
+                myCombineButton.disabled = false;
+                return;
+            }
+
+            // 3. Run the FFmpeg command
+            myStatusDiv.innerText = 'Combining videos (This might take a while for large files)...';
+            try {
+                // The FFmpeg command: Concatenate using copy streams (fastest)
+                await myFFmpeg.run(
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', myListFileName,
+                    '-c', 'copy',
+                    myOutputFileName
+                );
+            } catch (error) {
+                myStatusDiv.innerText = `Error running FFmpeg command: ${error.message}`;
+                console.error(error);
+                myCombineButton.disabled = false;
+                return;
+            }
+
+            // 4. Read Output and 5. Download
+            myStatusDiv.innerText = 'Combination complete. Preparing download...';
+            try {
+                const myCombinedData = myFFmpeg.FS('readFile', myOutputFileName);
+                const myMovieBlob = new Blob([myCombinedData.buffer], { type: 'video/mp4' });
+                const myDownloadUrl = URL.createObjectURL(myMovieBlob);
+
+                // Create and click a temporary link for download
+                const myDownloadLink = document.createElement('a');
+                myDownloadLink.href = myDownloadUrl;
+                myDownloadLink.download = myOutputFileName;
+                document.body.appendChild(myDownloadLink);
+                myDownloadLink.click();
+                document.body.removeChild(myDownloadLink);
+
+                myStatusDiv.innerText = 'Success! Your combined movie has been downloaded.';
+            } catch (error) {
+                myStatusDiv.innerText = `Error during download: ${error.message}`;
+                myCombineButton.disabled = false;
+                return;
+            }
+
+            // Cleanup the virtual file system
+            try {
+                 myFFmpeg.FS('unlink', myFileNameOne);
+                 myFFmpeg.FS('unlink', myFileNameTwo);
+                 myFFmpeg.FS('unlink', myListFileName);
+                 myFFmpeg.FS('unlink', myOutputFileName);
+            } catch (e) { /* Ignore cleanup errors */ }
+            
+            myCombineButton.disabled = false;
+        }
+
+        // --- 6. Initialization ---
+        // This process uses async/await and the new FFmpegUtil to load the core files.
+        (async () => {
+             myStatusDiv.innerText = 'Initializing FFmpeg library in the background...';
+             
+             try {
+                await myFFmpeg.load({
+                    myCoreURL: await FFmpegUtil.toBlobURL(`${myCoreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    myWasmURL: await FFmpegUtil.toBlobURL(`${myCoreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
+                // Once loaded, check if files are already selected to enable the button
+                myCheckReady();
+             } catch (error) {
+                myStatusDiv.innerText = 'Error initializing FFmpeg. Please check console for details.';
+                console.error("FFmpeg Initialization Error:", error);
+             }
+        })();
+    </script>
+
+</body>
+</html>
