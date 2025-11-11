@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Basic Video Clipper and Saver</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; max-width: 640px; margin: auto; padding: 20px; }
+        h2 { color: #dc3545; }
+        .myControlGroup { 
+            border: 1px solid #ccc; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 25px;
+        }
+        input[type="range"] { width: 100%; margin: 5px 0; }
+        .myTimeDisplay { font-weight: bold; margin-bottom: 5px; }
+        button { 
+            padding: 12px 25px; 
+            background-color: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            margin-top: 15px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .myStatus { 
+            padding: 10px; 
+            background-color: #f0f0f0; 
+            border-radius: 4px; 
+            margin-top: 20px;
+        }
+        video { border: 2px solid #28a745; max-width: 100%; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <h2>Basic Movie Clipper</h2>
+    
+    <div class="myStatus" id="myStatusMessage">Initializing...</div>
+
+    <div class="myControlGroup">
+        <label for="myFileInput">Select Movie File:</label>
+        <input type="file" id="myFileInput" accept="video/*" onchange="myLoadVideo(this.files[0])" />
+    </div>
+
+    <video id="myPreviewVideo" controls style="display: none;"></video>
+
+    <div id="myClippingControls" style="display: none;">
+        
+        <div class="myTimeDisplay" id="myStartTimeDisplay">Start Time: 00:00:00</div>
+        <input type="range" id="myStartSlider" min="0" max="1" value="0" step="0.1" oninput="myUpdateClipTime()" />
+        
+        <div class="myTimeDisplay" id="myEndTimeDisplay">End Time: 00:00:00</div>
+        <input type="range" id="myEndSlider" min="0" max="1" value="1" step="0.1" oninput="myUpdateClipTime()" />
+
+        <button onclick="myTrimAndSaveMovie()" id="mySaveButton" disabled>
+            ✂️ Clip and Save Movie
+        </button>
+    </div>
+    
+    <script type="module">
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/ffmpeg.js';
+        import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/util.js';
+
+        const ffmpeg = new FFmpeg(); 
+        
+        const myStatusDiv = document.getElementById('myStatusMessage');
+        const myPreviewVideo = document.getElementById('myPreviewVideo');
+        const myStartSlider = document.getElementById('myStartSlider');
+        const myEndSlider = document.getElementById('myEndSlider');
+        const myStartTimeDisplay = document.getElementById('myStartTimeDisplay');
+        const myEndTimeDisplay = document.getElementById('myEndTimeDisplay');
+        const myClippingControls = document.getElementById('myClippingControls');
+        const mySaveButton = document.getElementById('mySaveButton');
+        const myFileInput = document.getElementById('myFileInput');
+
+        let isFFmpegLoaded = false; 
+        const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/esm';
+
+        // Add logging to see progress
+        ffmpeg.on('log', ({ message }) => {
+            console.log(message);
+        });
+
+        function myFormatTime(myTotalSeconds) {
+            const myHours = Math.floor(myTotalSeconds / 3600).toString().padStart(2, '0');
+            const myMinutes = Math.floor((myTotalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const mySeconds = (myTotalSeconds % 60).toFixed(1).toString().padStart(4, '0');
+            return `${myHours}:${myMinutes}:${mySeconds}`;
+        }
+
+        window.myLoadVideo = async function (file) {
+            if (!file) {
+                myClippingControls.style.display = 'none';
+                myPreviewVideo.style.display = 'none';
+                return;
+            }
+            
+            if (!isFFmpegLoaded) {
+                myStatusDiv.innerText = 'FFmpeg is still initializing. Please wait a moment.';
+                return;
+            }
+
+            myPreviewVideo.src = URL.createObjectURL(file);
+            myPreviewVideo.style.display = 'block';
+            myClippingControls.style.display = 'none';
+            mySaveButton.disabled = true;
+
+            myStatusDiv.innerText = 'Loading video metadata...';
+            
+            await new Promise(resolve => {
+                myPreviewVideo.onloadedmetadata = () => {
+                    resolve();
+                };
+            });
+            
+            mySetSliders(myPreviewVideo.duration);
+            myClippingControls.style.display = 'block';
+            mySaveButton.disabled = false;
+
+            myPreviewVideo.ontimeupdate = myCheckClipEnd;
+            
+            myStatusDiv.innerText = 'Video loaded. Adjust the sliders to set clip points.';
+        }
+        
+        function mySetSliders(duration) {
+            myStartSlider.max = duration;
+            myEndSlider.max = duration;
+            myStartSlider.value = 0;
+            myEndSlider.value = duration;
+            myUpdateClipTime();
+        }
+
+        function myUpdateClipTime() {
+            let myStartTime = parseFloat(myStartSlider.value);
+            let myEndTime = parseFloat(myEndSlider.value);
+            
+            if (myStartTime >= myEndTime) {
+                if (document.activeElement === myStartSlider) {
+                    myEndTime = Math.min(myStartTime + 0.1, myPreviewVideo.duration);
+                    myEndSlider.value = myEndTime;
+                } else {
+                    myStartTime = Math.max(myEndTime - 0.1, 0);
+                    myStartSlider.value = myStartTime;
+                }
+            }
+            
+            myStartTimeDisplay.textContent = `Start Time: ${myFormatTime(myStartTime)}`;
+            myEndTimeDisplay.textContent = `End Time: ${myFormatTime(myEndTime)}`;
+            myPreviewVideo.currentTime = myStartTime;
+        }
+
+        function myCheckClipEnd() {
+            const myEndTime = parseFloat(myEndSlider.value);
+            if (myPreviewVideo.currentTime >= myEndTime) {
+                myPreviewVideo.currentTime = parseFloat(myStartSlider.value);
+                if (!myPreviewVideo.paused) {
+                    myPreviewVideo.pause();
+                }
+            }
+        }
+
+        window.myTrimAndSaveMovie = async function () {
+            mySaveButton.disabled = true;
+            const inputFile = myFileInput.files[0];
+            const outputFileName = 'clipped_movie_' + Date.now() + '.mp4';
+            const inputFileName = 'input.mp4';
+            
+            if (!isFFmpegLoaded) {
+                myStatusDiv.innerText = 'Error: FFmpeg is not loaded correctly.';
+                mySaveButton.disabled = false;
+                return;
+            }
+
+            const startTime = parseFloat(myStartSlider.value);
+            const endTime = parseFloat(myEndSlider.value);
+            const duration = endTime - startTime;
+
+            myStatusDiv.innerText = 'Writing movie to virtual file system...';
+            try {
+                // Use writeFile method with fetchFile to load the file
+                await ffmpeg.writeFile(inputFileName, await fetchFile(inputFile));
+            } catch (error) {
+                myStatusDiv.innerText = `Error writing file: ${error.message}`;
+                mySaveButton.disabled = false;
+                return;
+            }
+
+            myStatusDiv.innerText = 'Trimming movie... (This may take a moment)';
+            try {
+                // Use exec method instead of run
+                await ffmpeg.exec([
+                    '-ss', startTime.toString(),
+                    '-i', inputFileName,
+                    '-t', duration.toString(),
+                    '-c', 'copy',
+                    outputFileName
+                ]);
+            } catch (error) {
+                myStatusDiv.innerText = `Error trimming movie: ${error.message}`;
+                console.error(error);
+                mySaveButton.disabled = false;
+                return;
+            }
+
+            myStatusDiv.innerText = 'Trimming complete. Preparing download...';
+            try {
+                // Use readFile method to get the output
+                const clippedData = await ffmpeg.readFile(outputFileName);
+                const movieBlob = new Blob([clippedData], { type: 'video/mp4' }); 
+                const downloadUrl = URL.createObjectURL(movieBlob); 
+
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = outputFileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+                myStatusDiv.innerText = 'Success! Your clipped movie has been downloaded.';
+            } catch (error) {
+                myStatusDiv.innerText = `Error during download: ${error.message}`;
+                mySaveButton.disabled = false;
+                return;
+            }
+
+            try {
+                await ffmpeg.deleteFile(inputFileName);
+                await ffmpeg.deleteFile(outputFileName);
+            } catch (e) {
+                console.log('Cleanup error (non-critical):', e);
+            }
+            
+            mySaveButton.disabled = false;
+        }
+        
+        (async () => {
+             myStatusDiv.innerText = 'Initializing FFmpeg library in the background...';
+             
+             try {
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
+                isFFmpegLoaded = true;
+                myStatusDiv.innerText = 'Ready. Select a movie file.';
+             } catch (error) {
+                myStatusDiv.innerText = 'Error initializing FFmpeg. Please check the console for details.';
+                console.error("FFmpeg Initialization Error:", error);
+                mySaveButton.disabled = true;
+             }
+        })();
+    </script>
+
+</body>
+</html>
