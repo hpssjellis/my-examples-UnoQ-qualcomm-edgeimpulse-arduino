@@ -2,8 +2,6 @@
 <html>
 <head>
     <title>Basic Video Clipper and Saver</title>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/util.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js"></script>
     <style>
         /* Minimal inline CSS */
         body { font-family: sans-serif; text-align: center; max-width: 640px; margin: auto; padding: 20px; }
@@ -61,12 +59,16 @@
         </button>
     </div>
     
-    <script>
-        // --- 1. Global Variables & FFmpeg Setup (myVariables) ---
+    <script type="module">
+        // --- 1. Imports and FFmpeg Setup ---
+        // Importing modules guarantees the class names (FFmpeg and toBlobURL) are available.
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/ffmpeg.js';
+        import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/util.js';
+
+        // FFmpeg Instance (Standard Name)
+        const ffmpeg = new FFmpeg(); 
         
-        // This will hold the instantiated FFmpeg object
-        let myFFmpeg = null; 
-        
+        // Custom Variables (Use 'my')
         const myStatusDiv = document.getElementById('myStatusMessage');
         const myPreviewVideo = document.getElementById('myPreviewVideo');
         const myStartSlider = document.getElementById('myStartSlider');
@@ -77,11 +79,11 @@
         const mySaveButton = document.getElementById('mySaveButton');
         const myFileInput = document.getElementById('myFileInput');
 
-        let myIsPlayingClip = false; 
+        // Global Variable to check loading state (Standard Name)
+        let isFFmpegLoaded = false; 
 
-        // Define the base URL for the core files (must match the version)
-        const myCoreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/umd';
-
+        // Define the base URL for the core files (Standard Name)
+        const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/esm';
 
         // --- 2. Utility Functions ---
         
@@ -99,42 +101,42 @@
         
         /**
          * Converts a user-selected File object into a buffer array FFmpeg can use.
-         * @param {File} myFile The file object to read.
+         * Note: Using standard naming for external utility fetchFile is ideal, but for 
+         * file system write, we stick to arrayBuffer for simplicity.
+         * @param {File} file The file object to read.
          * @returns {Promise<Uint8Array>} The file data as a Uint8Array.
          */
-        async function myGetFileBuffer(myFile) {
-            const myFileArrayBuffer = await myFile.arrayBuffer();
-            return new Uint8Array(myFileArrayBuffer);
+        async function myGetFileBuffer(file) {
+            // Note: Students can look up 'arrayBuffer'
+            const fileArrayBuffer = await file.arrayBuffer();
+            return new Uint8Array(fileArrayBuffer);
         }
 
-        // --- 3. Core Video Loading & UI Setup ---
+        // --- 3. Core Video Loading & UI Setup (Functions remain 'my' functions) ---
 
         /**
          * Loads the selected video file and sets up clipping controls.
-         * Uses async/await as preferred.
-         * @param {File} myFile The selected video file object.
          */
-        async function myLoadVideo(myFile) {
-            if (!myFile) {
+        window.myLoadVideo = async function (file) {
+            if (!file) {
                 myClippingControls.style.display = 'none';
                 myPreviewVideo.style.display = 'none';
                 return;
             }
             
-            if (!myFFmpeg) {
+            if (!isFFmpegLoaded) {
                 myStatusDiv.innerText = 'FFmpeg is still initializing. Please wait a moment.';
                 return;
             }
 
             // Create a temporary URL for the video file
-            myPreviewVideo.src = URL.createObjectURL(myFile);
+            myPreviewVideo.src = URL.createObjectURL(file);
             myPreviewVideo.style.display = 'block';
             myClippingControls.style.display = 'none';
             mySaveButton.disabled = true;
 
             myStatusDiv.innerText = 'Loading video metadata...';
             
-            // Wait for the video metadata (like duration) to load
             await new Promise(resolve => {
                 myPreviewVideo.onloadedmetadata = () => {
                     resolve();
@@ -145,40 +147,27 @@
             myClippingControls.style.display = 'block';
             mySaveButton.disabled = false;
 
-            // Attach the event listener for continuous clipping loop preview
             myPreviewVideo.ontimeupdate = myCheckClipEnd;
             
             myStatusDiv.innerText = 'Video loaded. Adjust the sliders to set clip points.';
         }
 
-        /**
-         * Sets the max value of the sliders based on the video's duration.
-         * @param {number} myDuration The total video duration in seconds.
-         */
-        function mySetSliders(myDuration) {
-            // Sliders max value should be the duration, step is 0.1s for fine control
-            myStartSlider.max = myDuration;
-            myEndSlider.max = myDuration;
-            
-            // Default start is 0, default end is the max duration
+        // ... (mySetSliders, myUpdateClipTime, myCheckClipEnd remain mostly the same, 
+        // using standard names for video properties like duration) ...
+        
+        function mySetSliders(duration) {
+            myStartSlider.max = duration;
+            myEndSlider.max = duration;
             myStartSlider.value = 0;
-            myEndSlider.value = myDuration;
-
-            myUpdateClipTime(); // Update the display text initially
+            myEndSlider.value = duration;
+            myUpdateClipTime();
         }
 
-        // --- 4. Clipping Logic (User-Sensible Sliders) ---
-
-        /**
-         * Called when a slider value changes. Updates display and enforces constraints.
-         */
         function myUpdateClipTime() {
             let myStartTime = parseFloat(myStartSlider.value);
             let myEndTime = parseFloat(myEndSlider.value);
             
-            // Constraint Check: Ensure Start Time is not greater than End Time
             if (myStartTime >= myEndTime) {
-                // Adjust the opposing slider slightly to maintain validity
                 if (document.activeElement === myStartSlider) {
                     myEndTime = Math.min(myStartTime + 0.1, myPreviewVideo.duration);
                     myEndSlider.value = myEndTime;
@@ -188,56 +177,48 @@
                 }
             }
             
-            // Update the user-friendly time displays
             myStartTimeDisplay.textContent = `Start Time: ${myFormatTime(myStartTime)}`;
             myEndTimeDisplay.textContent = `End Time: ${myFormatTime(myEndTime)}`;
-
-            // Seek the video to the start time for preview when dragging
             myPreviewVideo.currentTime = myStartTime;
         }
 
-        /**
-         * Checks the video's current time against the end clip point for looping (for preview).
-         */
         function myCheckClipEnd() {
             const myEndTime = parseFloat(myEndSlider.value);
-
-            // If the current time is at or past the end point, loop back to the start
             if (myPreviewVideo.currentTime >= myEndTime) {
                 myPreviewVideo.currentTime = parseFloat(myStartSlider.value);
-                // Keep playing to loop the preview
                 if (myPreviewVideo.paused) {
                     myPreviewVideo.play();
                 }
             }
         }
 
+
         // --- 5. FFmpeg Trimming and Saving Logic ---
 
         /**
          * Executes the FFmpeg trim command and saves the resulting file.
-         * Uses async/await as preferred.
          */
-        async function myTrimAndSaveMovie() {
+        window.myTrimAndSaveMovie = async function () {
             mySaveButton.disabled = true;
-            const myInputFile = myFileInput.files[0];
-            const myOutputFileName = 'clipped_movie_' + Date.now() + '.mp4';
-            const myInputFileName = 'input.mp4';
+            const inputFile = myFileInput.files[0]; // Standard name
+            const outputFileName = 'clipped_movie_' + Date.now() + '.mp4'; // Standard name
+            const inputFileName = 'input.mp4'; // Standard name
             
-            if (!myFFmpeg || !myFFmpeg.loaded) {
+            if (!isFFmpegLoaded) {
                 myStatusDiv.innerText = 'Error: FFmpeg is not loaded correctly.';
                 mySaveButton.disabled = false;
                 return;
             }
 
-            const myStartTime = parseFloat(myStartSlider.value);
-            const myEndTime = parseFloat(myEndSlider.value);
-            const myDuration = myEndTime - myStartTime;
+            const startTime = parseFloat(myStartSlider.value); // Standard name
+            const endTime = parseFloat(myEndSlider.value); // Standard name
+            const duration = endTime - startTime; // Standard name
 
             // 1. Write File to Virtual FS
             myStatusDiv.innerText = 'Writing movie to virtual file system...';
             try {
-                myFFmpeg.FS('writeFile', myInputFileName, await myGetFileBuffer(myInputFile));
+                // Use 'ffmpeg' instance and standard function name 'writeFile'
+                ffmpeg.FS('writeFile', inputFileName, await myGetFileBuffer(inputFile));
             } catch (error) {
                 myStatusDiv.innerText = `Error writing file to FS: ${error.message}`;
                 mySaveButton.disabled = false; return;
@@ -246,13 +227,13 @@
             // 2. Run the FFmpeg trim command
             myStatusDiv.innerText = 'Trimming movie... (This may take a moment)';
             try {
-                // FFmpeg command: -ss start time, -i input file, -t duration, -c copy (fastest)
-                await myFFmpeg.run(
-                    '-ss', myStartTime.toString(),
-                    '-i', myInputFileName,
-                    '-t', myDuration.toString(),
+                // Use 'ffmpeg' instance and standard function name 'run'
+                await ffmpeg.run(
+                    '-ss', startTime.toString(),
+                    '-i', inputFileName,
+                    '-t', duration.toString(),
                     '-c', 'copy',
-                    myOutputFileName
+                    outputFileName
                 );
             } catch (error) {
                 myStatusDiv.innerText = `Error trimming movie: ${error.message}`;
@@ -263,17 +244,19 @@
             // 3. Read Output and Download
             myStatusDiv.innerText = 'Trimming complete. Preparing download...';
             try {
-                const myClippedData = myFFmpeg.FS('readFile', myOutputFileName);
-                const myMovieBlob = new Blob([myClippedData.buffer], { type: 'video/mp4' });
-                const myDownloadUrl = URL.createObjectURL(myMovieBlob);
+                // Use 'ffmpeg' instance and standard function name 'readFile'
+                const clippedData = ffmpeg.FS('readFile', outputFileName);
+                // Standard names for system objects
+                const movieBlob = new Blob([clippedData.buffer], { type: 'video/mp4' }); 
+                const downloadUrl = URL.createObjectURL(movieBlob); 
 
-                // Create and click a temporary link for download
-                const myDownloadLink = document.createElement('a');
-                myDownloadLink.href = myDownloadUrl;
-                myDownloadLink.download = myOutputFileName;
-                document.body.appendChild(myDownloadLink);
-                myDownloadLink.click();
-                document.body.removeChild(myDownloadLink);
+                // Create and click a temporary link for download (use standard element names)
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = outputFileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
 
                 myStatusDiv.innerText = 'Success! Your clipped movie has been downloaded.';
             } catch (error) {
@@ -283,30 +266,25 @@
 
             // 4. Cleanup
             try {
-                 myFFmpeg.FS('unlink', myInputFileName);
-                 myFFmpeg.FS('unlink', myOutputFileName);
+                 // Use 'ffmpeg' instance and standard function name 'unlink'
+                 ffmpeg.FS('unlink', inputFileName);
+                 ffmpeg.FS('unlink', outputFileName);
             } catch (e) { /* Ignore cleanup errors */ }
             
-            mySaveButton.disabled = true; // Disable button until a new file is loaded
+            mySaveButton.disabled = true;
         }
         
-        // --- 6. Initialization (The Fix) ---
-        // We ensure FFmpeg is available before attempting to use it.
+        // --- 6. Initialization (The Module Fix) ---
         (async () => {
              myStatusDiv.innerText = 'Initializing FFmpeg library in the background...';
              
              try {
-                // Wait for the scripts to load, then use the globally defined constructors (FFmpeg and FFmpegUtil)
-                // We wrap the instantiation in an async function to use the await keywords correctly
-                const FFmpegClass = window.FFmpeg;
-                if (!FFmpegClass) throw new Error("FFmpeg class not found after script load.");
-
-                myFFmpeg = new FFmpegClass(); 
-                
-                await myFFmpeg.load({
-                    myCoreURL: await FFmpegUtil.toBlobURL(`${myCoreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    myWasmURL: await FFmpegUtil.toBlobURL(`${myCoreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                // Use standard names 'toBlobURL' and 'coreBaseURL' in the options object
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
+                isFFmpegLoaded = true; // Set the global state flag
                 myStatusDiv.innerText = 'Ready. Select a movie file.';
              } catch (error) {
                 myStatusDiv.innerText = 'Error initializing FFmpeg. Please ensure scripts are loaded and check the console.';
