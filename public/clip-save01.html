@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clip, Combine, and Save Movie</title>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.7/dist/ffmpeg.min.js"></script>
+    <style>
+        /* Minimal inline CSS */
+        body { font-family: sans-serif; text-align: center; margin-top: 20px; }
+        h2 { color: #dc3545; }
+        .mySection { 
+            border: 2px solid #007bff; 
+            padding: 20px; 
+            margin: 20px auto; 
+            border-radius: 8px; 
+            max-width: 95%; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+        }
+        .myControlGroup { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            border-radius: 5px; 
+            text-align: left;
+        }
+        input[type="file"] { margin-top: 5px; }
+        input[type="range"] { width: 100%; margin: 5px 0; }
+        .myTimeDisplay { font-weight: bold; margin-bottom: 5px; }
+        button { 
+            padding: 12px 25px; 
+            background-color: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            margin-top: 15px;
+        }
+        .myStatus { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background-color: #f0f0f0; 
+            border-radius: 4px; 
+            text-align: center;
+        }
+        video { border: 2px solid #28a745; max-width: 100%; }
+    </style>
+</head>
+<body>
+
+    <h2>Combined Video Clipper and Merger</h2>
+    
+    <div class="myStatus" id="myStatusMessage">Initializing...</div>
+
+    <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+        
+        <div id="myVideoOneSection" class="mySection" style="max-width: 45%;">
+            <h3>Movie 1</h3>
+            <div class="myControlGroup">
+                <label for="myFileInputOne">Select First Movie:</label>
+                <input type="file" id="myFileInputOne" accept="video/*" onchange="myLoadVideo(this.files[0], 1)" />
+            </div>
+
+            <video id="myPreviewVideoOne" controls style="display: none;"></video>
+
+            <div id="myClippingControlsOne" style="display: none;">
+                <div class="myTimeDisplay" id="myStartTimeDisplayOne">Start Time: 00:00:00</div>
+                <input type="range" id="myStartSliderOne" min="0" max="1" value="0" step="0.1" oninput="myUpdateClipTime(1)" />
+                <div class="myTimeDisplay" id="myEndTimeDisplayOne">End Time: 00:00:00</div>
+                <input type="range" id="myEndSliderOne" min="0" max="1" value="1" step="0.1" oninput="myUpdateClipTime(1)" />
+                <button onclick="myToggleClipPlay(1)" style="background-color: #ffc107;">▶️ Preview Clip 1</button>
+            </div>
+        </div>
+
+        <div id="myVideoTwoSection" class="mySection" style="max-width: 45%;">
+            <h3>Movie 2</h3>
+            <div class="myControlGroup">
+                <label for="myFileInputTwo">Select Second Movie:</label>
+                <input type="file" id="myFileInputTwo" accept="video/*" onchange="myLoadVideo(this.files[0], 2)" />
+            </div>
+
+            <video id="myPreviewVideoTwo" controls style="display: none;"></video>
+
+            <div id="myClippingControlsTwo" style="display: none;">
+                <div class="myTimeDisplay" id="myStartTimeDisplayTwo">Start Time: 00:00:00</div>
+                <input type="range" id="myStartSliderTwo" min="0" max="1" value="0" step="0.1" oninput="myUpdateClipTime(2)" />
+                <div class="myTimeDisplay" id="myEndTimeDisplayTwo">End Time: 00:00:00</div>
+                <input type="range" id="myEndSliderTwo" min="0" max="1" value="1" step="0.1" oninput="myUpdateClipTime(2)" />
+                <button onclick="myToggleClipPlay(2)" style="background-color: #ffc107;">▶️ Preview Clip 2</button>
+            </div>
+        </div>
+
+    </div>
+
+    <button onclick="myTrimAndCombineMovies()" id="myCombineButton" disabled>
+        ✂️ Trim and Combine Videos
+    </button>
+    
+    <script>
+        // --- 1. Global Variables & FFmpeg Setup (myVariables) ---
+        
+        // Initialize FFmpeg library
+        const myFFmpeg = new FFmpeg.Ffmpeg();
+        const myStatusDiv = document.getElementById('myStatusMessage');
+        const myCombineButton = document.getElementById('myCombineButton');
+
+        // Store references for both videos in an array for easy access
+        const myVideoElements = [null, 
+            { // Index 1
+                video: document.getElementById('myPreviewVideoOne'),
+                controls: document.getElementById('myClippingControlsOne'),
+                startSlider: document.getElementById('myStartSliderOne'),
+                endSlider: document.getElementById('myEndSliderOne'),
+                startDisplay: document.getElementById('myStartTimeDisplayOne'),
+                endDisplay: document.getElementById('myEndTimeDisplayOne'),
+                button: document.querySelector('#myClippingControlsOne button'),
+                isPlayingClip: false,
+                file: null
+            },
+            { // Index 2
+                video: document.getElementById('myPreviewVideoTwo'),
+                controls: document.getElementById('myClippingControlsTwo'),
+                startSlider: document.getElementById('myStartSliderTwo'),
+                endSlider: document.getElementById('myEndSliderTwo'),
+                startDisplay: document.getElementById('myStartTimeDisplayTwo'),
+                endDisplay: document.getElementById('myEndTimeDisplayTwo'),
+                button: document.querySelector('#myClippingControlsTwo button'),
+                isPlayingClip: false,
+                file: null
+            }
+        ];
+        
+        // --- 2. Utility Functions ---
+        
+        /**
+         * Converts a time in seconds to an HH:MM:SS.X string for user display.
+         * @param {number} myTotalSeconds The time in seconds.
+         * @returns {string} The formatted time string.
+         */
+        function myFormatTime(myTotalSeconds) {
+            const myHours = Math.floor(myTotalSeconds / 3600).toString().padStart(2, '0');
+            const myMinutes = Math.floor((myTotalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const mySeconds = (myTotalSeconds % 60).toFixed(1).toString().padStart(4, '0');
+            return `${myHours}:${myMinutes}:${mySeconds}`;
+        }
+        
+        /**
+         * Converts a user-selected File object into a buffer array FFmpeg can use.
+         * @param {File} myFile The file object to read.
+         * @returns {Promise<Uint8Array>} The file data as a Uint8Array.
+         */
+        async function myGetFileBuffer(myFile) {
+            const myFileArrayBuffer = await myFile.arrayBuffer();
+            return new Uint8Array(myFileArrayBuffer);
+        }
+
+        // --- 3. Video Loading and UI Setup ---
+
+        /**
+         * Loads the selected video file and sets up clipping controls.
+         * Uses async/await as preferred.
+         * @param {File} myFile The selected video file object.
+         * @param {number} myIndex The index of the video (1 or 2).
+         */
+        async function myLoadVideo(myFile, myIndex) {
+            if (!myFile) return;
+
+            const myElements = myVideoElements[myIndex];
+            myElements.file = myFile; // Store file object
+            
+            // Create a temporary URL for the video file
+            myElements.video.src = URL.createObjectURL(myFile);
+            myElements.video.style.display = 'block';
+            myElements.controls.style.display = 'none';
+
+            myStatusDiv.innerText = `Loading metadata for Video ${myIndex}...`;
+            
+            // Wait for the video metadata (like duration) to load
+            await new Promise(resolve => {
+                myElements.video.onloadedmetadata = () => {
+                    resolve();
+                };
+            });
+            
+            mySetSliders(myElements, myElements.video.duration);
+            myElements.controls.style.display = 'block';
+
+            // Attach the clip checking function
+            myElements.video.ontimeupdate = () => myCheckClipEnd(myIndex);
+            
+            // Check if both files are loaded to enable the combine button
+            if (myVideoElements[1].file && myVideoElements[2].file) {
+                myCombineButton.disabled = false;
+                myStatusDiv.innerText = 'Two videos loaded. Ready to trim and combine.';
+            } else {
+                myStatusDiv.innerText = `Video ${myIndex} loaded. Waiting for the other video...`;
+            }
+        }
+
+        /**
+         * Sets the slider limits based on the video's duration and updates display.
+         * @param {object} myElements The video elements object (1 or 2).
+         * @param {number} myDuration The total video duration in seconds.
+         */
+        function mySetSliders(myElements, myDuration) {
+            // Set max duration for fine control (step 0.1s is sensible)
+            myElements.startSlider.max = myDuration;
+            myElements.endSlider.max = myDuration;
+            
+            // Default start is 0, default end is the max duration
+            myElements.startSlider.value = 0;
+            myElements.endSlider.value = myDuration;
+
+            // Update the display text initially
+            myUpdateClipTime(myElements);
+        }
+
+        // --- 4. Clipping Logic ---
+
+        /**
+         * Called when a slider value changes. Updates display and enforces constraints.
+         * @param {number|object} myIndexOrElements Index 1 or 2, or the elements object itself.
+         */
+        function myUpdateClipTime(myIndexOrElements) {
+            const myElements = (typeof myIndexOrElements === 'number') ? myVideoElements[myIndexOrElements] : myIndexOrElements;
+            
+            let myStartTime = parseFloat(myElements.startSlider.value);
+            let myEndTime = parseFloat(myElements.endSlider.value);
+            
+            // Constraint Check: Ensure Start Time is not greater than End Time
+            if (myStartTime >= myEndTime) {
+                // Determine which slider was moved and adjust the other one
+                if (document.activeElement === myElements.startSlider) {
+                    myEndTime = Math.min(myStartTime + 0.1, myElements.video.duration); // Push end forward slightly
+                    myElements.endSlider.value = myEndTime;
+                } else {
+                    myStartTime = Math.max(myEndTime - 0.1, 0); // Pull start backward slightly
+                    myElements.startSlider.value = myStartTime;
+                }
+            }
+            
+            // Update the user-friendly time displays
+            myElements.startDisplay.textContent = `Start Time: ${myFormatTime(myStartTime)}`;
+            myElements.endDisplay.textContent = `End Time: ${myFormatTime(myEndTime)}`;
+
+            // Seek the video to the start time for preview when dragging
+            myElements.video.currentTime = myStartTime;
+        }
+
+        /**
+         * Checks the video's current time against the end clip point for looping.
+         * @param {number} myIndex Index of the video (1 or 2).
+         */
+        function myCheckClipEnd(myIndex) {
+            const myElements = myVideoElements[myIndex];
+            
+            if (!myElements.isPlayingClip) return;
+            
+            const myEndTime = parseFloat(myElements.endSlider.value);
+
+            // If the current time is at or past the end point, loop back to the start
+            if (myElements.video.currentTime >= myEndTime) {
+                myElements.video.currentTime = parseFloat(myElements.startSlider.value);
+                // Ensure playback continues
+                if (myElements.video.paused) {
+                    myElements.video.play();
+                }
+            }
+        }
+
+        /**
+         * Toggles playing the video between normal and clipped loop mode.
+         * @param {number} myIndex Index of the video (1 or 2).
+         */
+        function myToggleClipPlay(myIndex) {
+            const myElements = myVideoElements[myIndex];
+
+            if (myElements.video.paused || !myElements.isPlayingClip) {
+                // Start playing the clip loop
+                myElements.video.currentTime = parseFloat(myElements.startSlider.value); // Jump to start point
+                myElements.video.play();
+                myElements.isPlayingClip = true;
+                myElements.button.textContent = '⏹️ Stop Clip Loop';
+                myElements.button.style.backgroundColor = '#dc3545';
+            } else {
+                // Stop playing the clip
+                myElements.video.pause();
+                myElements.isPlayingClip = false;
+                myElements.button.textContent = '▶️ Preview Clip ' + myIndex;
+                myElements.button.style.backgroundColor = '#ffc107';
+            }
+        }
+
+        // --- 5. FFmpeg Trimming and Combining Logic ---
+
+        /**
+         * Main function to trim both videos and combine them using FFmpeg in WebAssembly.
+         * Uses async/await as preferred.
+         */
+        async function myTrimAndCombineMovies() {
+            myCombineButton.disabled = true;
+            const myOutputFileName = 'combined_clipped_movie.mp4';
+            const myListFileName = 'concat_list.txt';
+
+            // 1. Initialize and Load FFmpeg
+            myStatusDiv.innerText = 'Initializing FFmpeg... Please wait.';
+            try {
+                if (!myFFmpeg.loaded) {
+                    await myFFmpeg.load();
+                }
+                myStatusDiv.innerText = 'FFmpeg loaded. Writing input files...';
+            } catch (error) {
+                myStatusDiv.innerText = `Error loading FFmpeg: ${error.message}`;
+                console.error(error);
+                myCombineButton.disabled = false;
+                return;
+            }
+
+            // --- Process and Trim Video 1 ---
+            const myInputOneName = 'input1.mp4';
+            const myTrimmedOneName = 'trimmed1.mp4';
+            const myElementsOne = myVideoElements[1];
+            const myDurationOne = parseFloat(myElementsOne.endSlider.value) - parseFloat(myElementsOne.startSlider.value);
+
+            // 2a. Write File 1 to Virtual FS
+            try {
+                myFFmpeg.FS('writeFile', myInputOneName, await myGetFileBuffer(myElementsOne.file));
+            } catch (error) {
+                myStatusDiv.innerText = `Error writing Video 1 to FS: ${error.message}`;
+                myCombineButton.disabled = false; return;
+            }
+
+            // 3a. Trim File 1
+            myStatusDiv.innerText = 'Trimming Video 1...';
+            try {
+                // -ss: Start seeking (input seeking is faster but less accurate)
+                // -i: Input file
+                // -t: Duration
+                // -c copy: Copy streams (fastest trim)
+                await myFFmpeg.run(
+                    '-ss', myElementsOne.startSlider.value.toString(),
+                    '-i', myInputOneName,
+                    '-t', myDurationOne.toString(),
+                    '-c', 'copy',
+                    myTrimmedOneName
+                );
+            } catch (error) {
+                myStatusDiv.innerText = `Error trimming Video 1: ${error.message}`;
+                myCombineButton.disabled = false; return;
+            }
+
+
+            // --- Process and Trim Video 2 ---
+            const myInputTwoName = 'input2.mp4';
+            const myTrimmedTwoName = 'trimmed2.mp4';
+            const myElementsTwo = myVideoElements[2];
+            const myDurationTwo = parseFloat(myElementsTwo.endSlider.value) - parseFloat(myElementsTwo.startSlider.value);
+            
+            // 2b. Write File 2 to Virtual FS
+            try {
+                myFFmpeg.FS('writeFile', myInputTwoName, await myGetFileBuffer(myElementsTwo.file));
+            } catch (error) {
+                myStatusDiv.innerText = `Error writing Video 2 to FS: ${error.message}`;
+                myCombineButton.disabled = false; return;
+            }
+
+            // 3b. Trim File 2
+            myStatusDiv.innerText = 'Trimming Video 2...';
+            try {
+                await myFFmpeg.run(
+                    '-ss', myElementsTwo.startSlider.value.toString(),
+                    '-i', myInputTwoName,
+                    '-t', myDurationTwo.toString(),
+                    '-c', 'copy',
+                    myTrimmedTwoName
+                );
+            } catch (error) {
+                myStatusDiv.innerText = `Error trimming Video 2: ${error.message}`;
+                myCombineButton.disabled = false; return;
+            }
+
+            // --- Combine Trimmed Files ---
+
+            // 4. Create concatenation list file
+            myStatusDiv.innerText = 'Creating combine list...';
+            const myListContent = `file '${myTrimmedOneName}'\nfile '${myTrimmedTwoName}'`;
+            myFFmpeg.FS('writeFile', myListFileName, myListContent);
+
+
+            // 5. Run Concatenation Command
+            myStatusDiv.innerText = 'Combining videos (This step can take a while)...';
+            try {
+                await myFFmpeg.run(
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', myListFileName,
+                    '-c', 'copy',
+                    myOutputFileName
+                );
+            } catch (error) {
+                myStatusDiv.innerText = `Error combining videos: ${error.message}`;
+                console.error(error);
+                myCombineButton.disabled = false; return;
+            }
+
+            // 6. Read Output and Download
+            myStatusDiv.innerText = 'Combination complete. Preparing download...';
+            try {
+                const myCombinedData = myFFmpeg.FS('readFile', myOutputFileName);
+                const myMovieBlob = new Blob([myCombinedData.buffer], { type: 'video/mp4' });
+                const myDownloadUrl = URL.createObjectURL(myMovieBlob);
+
+                // Create and click a temporary link for download
+                const myDownloadLink = document.createElement('a');
+                myDownloadLink.href = myDownloadUrl;
+                myDownloadLink.download = myOutputFileName;
+                document.body.appendChild(myDownloadLink);
+                myDownloadLink.click();
+                document.body.removeChild(myDownloadLink);
+
+                myStatusDiv.innerText = 'Success! Your combined movie has been downloaded.';
+            } catch (error) {
+                myStatusDiv.innerText = `Error during download: ${error.message}`;
+                myCombineButton.disabled = false; return;
+            }
+
+            // 7. Cleanup (Optional but good practice)
+            try {
+                 myFFmpeg.FS('unlink', myInputOneName);
+                 myFFmpeg.FS('unlink', myInputTwoName);
+                 myFFmpeg.FS('unlink', myTrimmedOneName);
+                 myFFmpeg.FS('unlink', myTrimmedTwoName);
+                 myFFmpeg.FS('unlink', myListFileName);
+                 myFFmpeg.FS('unlink', myOutputFileName);
+            } catch (e) { /* Ignore cleanup errors */ }
+            
+            myCombineButton.disabled = false;
+        }
+        
+        // --- 8. Initialization ---
+        // Ensure myFFmpeg is loaded on startup for faster processing when the button is pressed
+        (async () => {
+             myStatusDiv.innerText = 'Initializing FFmpeg library in the background...';
+             await myFFmpeg.load();
+             myStatusDiv.innerText = 'Ready. Select two movie files.';
+        })();
+        
+    </script>
+
+</body>
+</html>
