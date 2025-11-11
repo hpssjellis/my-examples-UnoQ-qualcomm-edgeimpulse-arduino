@@ -63,7 +63,7 @@
     </div>
     
     <script type="module">
-        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/ffmpeg.js';
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/ffmpeg.js';
         import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/util.js';
 
         const ffmpeg = new FFmpeg(); 
@@ -79,7 +79,7 @@
         const myFileInput = document.getElementById('myFileInput');
 
         let isFFmpegLoaded = false; 
-        const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/esm';
+        const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 
         // Add logging to see progress
         ffmpeg.on('log', ({ message }) => {
