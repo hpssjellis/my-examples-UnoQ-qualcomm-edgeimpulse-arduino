@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Combiner</title>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.7/dist/ffmpeg.min.js"></script>
+    <style>
+        /* Minimal inline CSS */
+        body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+        .myControlGroup { margin-bottom: 15px; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        button { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .myStatus { margin-top: 20px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <h2>Combine Two Movies</h2>
+
+    <div class="myControlGroup">
+        <label for="myVideoOneInput">Select First Movie:</label>
+        <input type="file" id="myVideoOneInput" accept="video/mp4,video/webm" />
+    </div>
+
+    <div class="myControlGroup">
+        <label for="myVideoTwoInput">Select Second Movie:</label>
+        <input type="file" id="myVideoTwoInput" accept="video/mp4,video/webm" />
+    </div>
+
+    <button onclick="myCombineAndSaveMovies()">Combine and Save Movie</button>
+
+    <div class="myStatus" id="myStatusMessage">Ready to combine.</div>
+
+    <script>
+        // Use 'my' prefix and camelCase for global variables
+        const myFFmpeg = new FFmpeg.Ffmpeg();
+        const myStatusDiv = document.getElementById('myStatusMessage');
+        const myVideoOneInput = document.getElementById('myVideoOneInput');
+        const myVideoTwoInput = document.getElementById('myVideoTwoInput');
+
+        /**
+         * Converts a user-selected File object into a buffer array FFmpeg can use.
+         * @param {File} myFile The file object to read.
+         * @returns {Promise<Uint8Array>} The file data as a Uint8Array.
+         */
+        async function myGetFileBuffer(myFile) {
+            const myFileArrayBuffer = await myFile.arrayBuffer();
+            return new Uint8Array(myFileArrayBuffer);
+        }
+
+        /**
+         * Main function to combine the videos using FFmpeg in WebAssembly.
+         * Uses async/await as preferred.
+         */
+        async function myCombineAndSaveMovies() {
+            const myFileOne = myVideoOneInput.files[0];
+            const myFileTwo = myVideoTwoInput.files[0];
+
+            if (!myFileOne || !myFileTwo) {
+                myStatusDiv.innerText = 'Error: Please select both video files.';
+                return;
+            }
+
+            // 1. Initialize and Load FFmpeg
+            myStatusDiv.innerText = 'Initializing FFmpeg... This may take a moment.';
+            try {
+                // Ensure FFmpeg is loaded/initialized only once
+                if (!myFFmpeg.loaded) {
+                    await myFFmpeg.load();
+                }
+                myStatusDiv.innerText = 'FFmpeg loaded. Processing videos...';
+            } catch (error) {
+                myStatusDiv.innerText = `Error loading FFmpeg: ${error.message}`;
+                console.error(error);
+                return;
+            }
+
+            // 2. Read Files and Write to Virtual FS
+            const myFileNameOne = 'input1.mp4';
+            const myFileNameTwo = 'input2.mp4';
+            const myOutputFileName = 'combined_movie.mp4';
+            const myListFileName = 'concat_list.txt';
+
+            try {
+                // Read and write the files to the FFmpeg virtual file system
+                myFFmpeg.FS('writeFile', myFileNameOne, await myGetFileBuffer(myFileOne));
+                myFFmpeg.FS('writeFile', myFileNameTwo, await myGetFileBuffer(myFileTwo));
+
+                // Create a list file for the concat demuxer
+                const myListContent = `file '${myFileNameOne}'\nfile '${myFileNameTwo}'`;
+                myFFmpeg.FS('writeFile', myListFileName, myListContent);
+
+            } catch (error) {
+                myStatusDiv.innerText = `Error writing files to virtual FS: ${error.message}`;
+                return;
+            }
+
+            // 3. Run the FFmpeg command
+            myStatusDiv.innerText = 'Combining videos (This might take a while for large files)...';
+            try {
+                // The FFmpeg command:
+                // -f concat: Use the concat demuxer
+                // -safe 0: Allow absolute or relative paths in the list file
+                // -i concat_list.txt: Input is the list file
+                // -c copy: Copy the streams (fastest, no re-encoding)
+                // combined_movie.mp4: The output file
+                await myFFmpeg.run(
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', myListFileName,
+                    '-c', 'copy',
+                    myOutputFileName
+                );
+            } catch (error) {
+                myStatusDiv.innerText = `Error running FFmpeg command: ${error.message}`;
+                console.error(error);
+                return;
+            }
+
+            // 4. Read Output and 5. Download
+            myStatusDiv.innerText = 'Combination complete. Preparing download...';
+            try {
+                const myCombinedData = myFFmpeg.FS('readFile', myOutputFileName);
+                const myMovieBlob = new Blob([myCombinedData.buffer], { type: 'video/mp4' });
+                const myDownloadUrl = URL.createObjectURL(myMovieBlob);
+
+                // Create and click a temporary link for download
+                const myDownloadLink = document.createElement('a');
+                myDownloadLink.href = myDownloadUrl;
+                myDownloadLink.download = myOutputFileName;
+                document.body.appendChild(myDownloadLink);
+                myDownloadLink.click();
+                document.body.removeChild(myDownloadLink);
+
+                myStatusDiv.innerText = 'Success! Your combined movie has been downloaded.';
+            } catch (error) {
+                myStatusDiv.innerText = `Error during download: ${error.message}`;
+                return;
+            }
+
+            // Cleanup the virtual file system (optional but good practice)
+            try {
+                 myFFmpeg.FS('unlink', myFileNameOne);
+                 myFFmpeg.FS('unlink', myFileNameTwo);
+                 myFFmpeg.FS('unlink', myListFileName);
+                 myFFmpeg.FS('unlink', myOutputFileName);
+            } catch (e) { /* Ignore cleanup errors */ }
+        }
+    </script>
+
+</body>
+</html>
