@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Video Clipper</title>
+    <style>
+        /* Minimal inline CSS based on your recorder style */
+        body { font-family: sans-serif; text-align: center; margin-top: 20px; }
+        h2 { color: #007bff; }
+        .myControlGroup { margin-bottom: 25px; border: 1px solid #ccc; padding: 15px; border-radius: 5px; max-width: 640px; margin-left: auto; margin-right: auto; }
+        
+        /* Style for the slider container */
+        .mySliderContainer { margin-top: 20px; }
+        
+        /* Style for the range slider for better interaction */
+        input[type="range"] { width: 100%; }
+        
+        /* Style for the time displays */
+        .myTimeDisplay { font-weight: bold; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>Video Clipping Tool</h2>
+    <p>Use the sliders to define the start and end points of your desired clip.</p>
+
+    <div class="myControlGroup">
+        <label for="myFileInput">Select Movie File:</label>
+        <input type="file" id="myFileInput" accept="video/*" onchange="myLoadVideo(this.files[0])" />
+    </div>
+
+    <video id="myPreviewVideo" controls style="display: none; border: 2px solid #28a745; max-width: 90%; margin-bottom: 20px;"></video>
+
+    <div id="myClippingControls" class="myControlGroup" style="display: none;">
+        
+        <div class="mySliderContainer">
+            <div id="myStartTimeDisplay" class="myTimeDisplay">Start Time: 00:00:00</div>
+            <input type="range" id="myStartSlider" min="0" max="100" value="0" step="0.1" oninput="myUpdateClipTime()" />
+        </div>
+        
+        <div class="mySliderContainer">
+            <div id="myEndTimeDisplay" class="myTimeDisplay">End Time: 00:00:00</div>
+            <input type="range" id="myEndSlider" min="0" max="100" value="100" step="0.1" oninput="myUpdateClipTime()" />
+        </div>
+
+        <button onclick="myToggleClipPlay()" style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 20px;">
+            ▶️ Play Clipped Segment
+        </button>
+    </div>
+    
+    <script>
+        // --- 1. Global Variables (myVariables) ---
+        const myPreviewVideo = document.getElementById('myPreviewVideo');
+        const myStartSlider = document.getElementById('myStartSlider');
+        const myEndSlider = document.getElementById('myEndSlider');
+        const myStartTimeDisplay = document.getElementById('myStartTimeDisplay');
+        const myEndTimeDisplay = document.getElementById('myEndTimeDisplay');
+        const myClippingControls = document.getElementById('myClippingControls');
+        
+        let myIsPlayingClip = false; // Tracks if we are currently looping the clipped segment
+
+        // --- 2. Utility Functions ---
+        
+        /**
+         * Converts a time in seconds to an HH:MM:SS string for user display.
+         * @param {number} myTotalSeconds The time in seconds.
+         * @returns {string} The formatted time string.
+         */
+        function myFormatTime(myTotalSeconds) {
+            const myHours = Math.floor(myTotalSeconds / 3600).toString().padStart(2, '0');
+            const myMinutes = Math.floor((myTotalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const mySeconds = (myTotalSeconds % 60).toFixed(1).toString().padStart(4, '0'); // Show one decimal
+            return `${myHours}:${myMinutes}:${mySeconds}`;
+        }
+
+        // --- 3. Core Video Loading ---
+
+        /**
+         * Loads the selected video file into the video element.
+         * Uses async/await as preferred.
+         * @param {File} myFile The selected video file object.
+         */
+        async function myLoadVideo(myFile) {
+            if (!myFile) return;
+
+            // Create a temporary URL for the video file
+            const myVideoUrl = URL.createObjectURL(myFile);
+            myPreviewVideo.src = myVideoUrl;
+            myPreviewVideo.style.display = 'block';
+
+            // Wait for the video metadata (like duration) to load
+            await new Promise(resolve => {
+                myPreviewVideo.onloadedmetadata = () => {
+                    resolve();
+                };
+            });
+            
+            // Now that metadata is loaded, set up the sliders
+            mySetSliders(myPreviewVideo.duration);
+            myClippingControls.style.display = 'block';
+
+            // Attach the event listener for continuous clipping loop
+            // NOTE: Using ontimeupdate is necessary for precise clipping control.
+            myPreviewVideo.ontimeupdate = myCheckClipEnd;
+            
+            // Reset clip playing state
+            myIsPlayingClip = false;
+        }
+
+        /**
+         * Sets the max value of the sliders based on the video's duration.
+         * @param {number} myDuration The total video duration in seconds.
+         */
+        function mySetSliders(myDuration) {
+            // Sliders max value should be the duration, step is 0.1s for fine control
+            myStartSlider.max = myDuration;
+            myEndSlider.max = myDuration;
+            
+            // Default start is 0, default end is the max duration
+            myStartSlider.value = 0;
+            myEndSlider.value = myDuration;
+
+            // Update the display text initially
+            myUpdateClipTime();
+        }
+
+        // --- 4. Clipping and Playback Functions ---
+
+        /**
+         * Called when a slider value changes.
+         * Updates the display, validates positions, and seeks the video preview.
+         */
+        function myUpdateClipTime() {
+            let myStartTime = parseFloat(myStartSlider.value);
+            let myEndTime = parseFloat(myEndSlider.value);
+
+            // Constraint Check 1: Ensure Start Time is not greater than End Time
+            if (myStartTime >= myEndTime) {
+                // If start moved past end, push the end time forward
+                if (myStartSlider === document.activeElement) {
+                    myEndTime = myStartTime;
+                    myEndSlider.value = myEndTime;
+                } 
+                // If end moved before start, pull the start time back
+                else {
+                    myStartTime = myEndTime;
+                    myStartSlider.value = myStartTime;
+                }
+            }
+            
+            // Update the user-friendly time displays
+            myStartTimeDisplay.textContent = `Start Time: ${myFormatTime(myStartTime)}`;
+            myEndTimeDisplay.textContent = `End Time: ${myFormatTime(myEndTime)}`;
+
+            // When the user drags a slider, seek the video to the start time for preview
+            myPreviewVideo.currentTime = myStartTime;
+            
+            // If the video is playing the clipped segment, restart it from the new start time
+            if (myIsPlayingClip) {
+                myPreviewVideo.play();
+            }
+        }
+
+        /**
+         * Checks the video's current time against the end clip point.
+         * If the end is reached, it jumps back to the start time to loop the clip.
+         */
+        function myCheckClipEnd() {
+            // Only enforce clipping if the user has explicitly clicked the "Play Clipped Segment" button
+            if (!myIsPlayingClip) return;
+            
+            const myEndTime = parseFloat(myEndSlider.value);
+
+            // If the current time is at or past the end point, loop back to the start
+            if (myPreviewVideo.currentTime >= myEndTime) {
+                myPreviewVideo.currentTime = parseFloat(myStartSlider.value);
+                // Continue playback if it was playing (this handles the loop)
+                if (!myPreviewVideo.paused) {
+                    myPreviewVideo.play();
+                }
+            }
+        }
+
+        /**
+         * Toggles playing the video between normal and clipped loop mode.
+         */
+        function myToggleClipPlay() {
+            if (myPreviewVideo.paused || !myIsPlayingClip) {
+                // Start playing the clip
+                myPreviewVideo.currentTime = parseFloat(myStartSlider.value); // Jump to start point
+                myPreviewVideo.play();
+                myIsPlayingClip = true;
+                document.querySelector('#myClippingControls button').textContent = '⏹️ Stop Clip Loop';
+                document.querySelector('#myClippingControls button').style.backgroundColor = '#dc3545';
+            } else {
+                // Stop playing the clip
+                myPreviewVideo.pause();
+                myIsPlayingClip = false;
+                document.querySelector('#myClippingControls button').textContent = '▶️ Play Clipped Segment';
+                document.querySelector('#myClippingControls button').style.backgroundColor = '#ffc107';
+            }
+        }
+
+    </script>
+</body>
+</html>
