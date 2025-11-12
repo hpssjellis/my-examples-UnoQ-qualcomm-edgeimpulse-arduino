@@ -9,19 +9,47 @@
     
     <h1 style="color: #007bff;">Webcam Capture and Recorder</h1>
 
-        <p>My main UnoQ Index <a href="https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/public/index.html"> here </a> </p>  
-        <p>My UnoQ Github is<a href="https://github.com/hpssjellis/my-examples-UnoQ-qualcomm-edgeimpulse-arduino"> my-examples-of-UnoQ... </a> </p>  
-        <p>You can find more of my work on my <a href="https://github.com/hpssjellis"> hpssjellis </a> GitHub Profile page:</p>
-        <p>Follow me Jeremy Ellis on <a href="https://ca.linkedin.com/in/jeremy-ellis-4237a9bb"> LinkedIn </a><br></p>
+    <p>My main UnoQ Index <a href="https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/public/index.html"> here </a> </p>  
+    <p>My UnoQ Github is<a href="https://github.com/hpssjellis/my-examples-UnoQ-qualcomm-edgeimpulse-arduino"> my-examples-of-UnoQ... </a> </p>  
+    <p>You can find more of my work on my <a href="https://github.com/hpssjellis"> hpssjellis </a> GitHub Profile page:</p>
+    <p>Follow me Jeremy Ellis on <a href="https://ca.linkedin.com/in/jeremy-ellis-4237a9bb"> LinkedIn </a><br></p>
 
     <video id="myLiveStreamVideo" autoplay playsinline style="display: none;"></video>
 
     <canvas id="myVideoCanvas" width="640" height="480" style="border: 2px solid #ccc; max-width: 90%; margin-bottom: 20px;"></canvas>
 
-    <!-- Display area for the recorded video -->
+    <div id="myControls" style="display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; margin-bottom: 20px;">
+        
+        <select id="myCameraSelect" style="padding: 10px; border: 1px solid #007bff; border-radius: 5px;">
+            <option>Loading Cameras...</option>
+        </select>
+        
+        <select id="myResolutionSelect" style="padding: 10px; border: 1px solid #ffc107; border-radius: 5px;">
+            <option>Loading Resolutions...</option>
+        </select>
+        
+        <select id="myFormatSelect" style="padding: 10px; border: 1px solid #28a745; border-radius: 5px;" disabled>
+            <option>Loading Formats...</option>
+        </select>
+        
+        <button id="myPhotoButton" style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
+            📸 Take Photo
+        </button>
+
+        <button id="myRecordButton" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
+            🔴 Start Recording
+        </button>
+        
+        <a id="myDownloadLink" style="display: inline-block; padding: 10px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px;">Download Video</a>
+    </div>
+    
+    <div style="margin-top: 20px; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 10px 0;">Upload Video for Clipping/Trimming</h3>
+        <input type="file" id="myUploadClipFile" accept="video/*" style="padding: 10px; border: 1px solid #007bff; border-radius: 5px;">
+    </div>
+
     <video id="myRecordedVideo" controls style="display: none; border: 2px solid green; max-width: 90%; margin-bottom: 20px;"></video>
 
-    <!-- Trimming Controls Container -->
     <div id="myTrimmingControls" style="display: none; max-width: 640px; margin: 0 auto 20px auto; padding: 15px; border: 2px solid #007bff; border-radius: 5px; background-color: #f0f8ff;">
         <h3 style="margin-top: 0;">Trim Video</h3>
         
@@ -48,7 +76,6 @@
         </button>
     </div>
 
-    <!-- Video Merging Controls -->
     <div id="myMergingControls" style="max-width: 800px; margin: 0 auto 20px auto; padding: 15px; border: 2px solid #ff6b6b; border-radius: 5px; background-color: #fff5f5;">
         <h3 style="margin-top: 0;">🎬 Merge Two Videos</h3>
         
@@ -83,34 +110,8 @@
         <a id="myMergedDownloadLink" style="display: none; padding: 10px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px; inline-block;">Download Merged Video</a>
     </div>
 
-    <!-- Controls Container -->
-    <div id="myControls" style="display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px;">
-        
-        <select id="myCameraSelect" style="padding: 10px; border: 1px solid #007bff; border-radius: 5px;">
-            <option>Loading Cameras...</option>
-        </select>
-        
-        <select id="myResolutionSelect" style="padding: 10px; border: 1px solid #ffc107; border-radius: 5px;">
-            <option>Loading Resolutions...</option>
-        </select>
-        
-        <select id="myFormatSelect" style="padding: 10px; border: 1px solid #28a745; border-radius: 5px;" disabled>
-            <option>Loading Formats...</option>
-        </select>
-        
-        <button id="myPhotoButton" style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
-            📸 Take Photo
-        </button>
-
-        <button id="myRecordButton" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
-            🔴 Start Recording
-        </button>
-        
-        <a id="myDownloadLink" style="display: none; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Download Video</a>
-    </div>
-
     <script>
-        // --- Global Variables ---
+        // --- Global Variables (UPDATED to include myUploadClipFile) ---
         const myLiveStreamVideo = document.getElementById('myLiveStreamVideo');
         const myVideoCanvas = document.getElementById('myVideoCanvas');
         const myRecordedVideo = document.getElementById('myRecordedVideo');
@@ -121,7 +122,10 @@
         const myRecordButton = document.getElementById('myRecordButton');
         const myDownloadLink = document.getElementById('myDownloadLink');
         const myCanvasContext = myVideoCanvas.getContext('2d');
-        
+
+        // NEW: Upload button for clipping
+        const myUploadClipFile = document.getElementById('myUploadClipFile'); 
+
         // Trimming elements
         const myTrimmingControls = document.getElementById('myTrimmingControls');
         const myStartSlider = document.getElementById('myStartSlider');
@@ -131,7 +135,7 @@
         const myDurationDisplay = document.getElementById('myDurationDisplay');
         const mySaveTrimmedButton = document.getElementById('mySaveTrimmedButton');
         const myCancelTrimButton = document.getElementById('myCancelTrimButton');
-        
+
         // Merging elements
         const myVideoFile1 = document.getElementById('myVideoFile1');
         const myVideoFile2 = document.getElementById('myVideoFile2');
@@ -144,18 +148,18 @@
         const myProgressBar = document.getElementById('myProgressBar');
         const myMergedVideo = document.getElementById('myMergedVideo');
         const myMergedDownloadLink = document.getElementById('myMergedDownloadLink');
-        
+
         let myCurrentStream = null;
         let myMediaRecorder = null;
         let myRecordedChunks = [];
         let myIsRecording = false;
-        let myRecordedVideoBlob = null;
+        let myRecordedVideoBlob = null; // Stores the active video (webcam recording OR uploaded file)
         let myVideoDuration = 0;
         let myVideo1Blob = null;
         let myVideo2Blob = null;
 
         // --- Setup Functions ---
-        
+
         function myLoadResolutionPresets() {
             const myResolutionPresets = [
                 { width: 1280, height: 720, name: 'HD (720p)' },
@@ -171,7 +175,7 @@
                 myOption.textContent = preset.name;
                 myResolutionSelect.appendChild(myOption);
             }
-            myResolutionSelect.value = '640x480'; 
+            myResolutionSelect.value = '640x480';  
         }
 
         function myLoadSupportedFormats() {
@@ -231,7 +235,7 @@
                 myCameraSelect.innerHTML = '<option>Permission Denied</option>';
             }
         }
-        
+
         async function myRequestMediaPermission() {
             const myTempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             myTempStream.getTracks().forEach(track => track.stop());
@@ -275,6 +279,7 @@
                     myVideoCanvas.height = myLiveStreamVideo.videoHeight;
                     myDrawLoop(); 
                     
+                    myVideoCanvas.style.display = 'block'; // Ensure canvas is visible for live view
                     myPhotoButton.disabled = false;
                     myRecordButton.disabled = false;
                 };
@@ -341,8 +346,11 @@
             myRecordButton.style.backgroundColor = '#007bff';
             myVideoCanvas.style.border = '4px dashed #dc3545';
             myRecordedVideo.style.display = 'none';
-            myDownloadLink.style.display = 'none';
+            myDownloadLink.textContent = 'Recording...';
+            myDownloadLink.href = '#';
+            myDownloadLink.style.backgroundColor = '#6c757d'; // Indicate not downloadable yet
             myTrimmingControls.style.display = 'none';
+            myUploadClipFile.value = ''; // Clear uploaded file when starting a new recording
         }
 
         function myStopRecording() {
@@ -357,7 +365,23 @@
 
         function myHandleRecordingStop() {
             myRecordedVideoBlob = new Blob(myRecordedChunks, { type: myMediaRecorder.mimeType });
-            const myVideoUrl = URL.createObjectURL(myRecordedVideoBlob);
+            mySetDownloadLink(myRecordedVideoBlob, 'webcam_recording_');
+            mySetRecordedVideoForTrimming(myRecordedVideoBlob);
+        }
+
+        // Sets the main download link properties
+        function mySetDownloadLink(blob, prefix) {
+            const myVideoUrl = URL.createObjectURL(blob);
+            myDownloadLink.href = myVideoUrl;
+            myDownloadLink.download = prefix + Date.now() + '.webm';
+            myDownloadLink.textContent = 'Download Video';
+            myDownloadLink.style.backgroundColor = '#007bff';
+        }
+
+        // Handles setup for myRecordedVideo element for both recording and upload
+        function mySetRecordedVideoForTrimming(blob) {
+            myRecordedVideoBlob = blob;
+            const myVideoUrl = URL.createObjectURL(blob);
             myRecordedVideo.src = myVideoUrl;
             myRecordedVideo.style.display = 'block';
             
@@ -365,9 +389,31 @@
                 myVideoDuration = myRecordedVideo.duration;
                 mySetupTrimmingControls();
             };
-
-            myDownloadLink.style.display = 'none';
         }
+
+
+        // --- Video Upload for Clipping ---
+
+        myUploadClipFile.onchange = function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Stop any active webcam stream/drawing to focus on the uploaded video
+                myStopCurrentStream(); 
+                // Hide the live view canvas
+                myVideoCanvas.style.display = 'none';
+                
+                mySetDownloadLink(file, 'uploaded_video_');
+                mySetRecordedVideoForTrimming(file);
+
+            } else {
+                // If upload is canceled/cleared, hide the recorded video/trimming controls
+                myRecordedVideo.style.display = 'none';
+                myTrimmingControls.style.display = 'none';
+                myDownloadLink.href = '#';
+                myDownloadLink.textContent = 'Download Video';
+                myDownloadLink.style.backgroundColor = '#6c757d'; 
+            }
+        };
 
         // --- Video Trimming Functions (IMPROVED WITH BETTER AUDIO) ---
 
@@ -427,13 +473,10 @@
             
             try {
                 const myTrimmedBlob = await myTrimVideoWithAudio(myRecordedVideoBlob, startTime, endTime);
-                const myTrimmedUrl = URL.createObjectURL(myTrimmedBlob);
                 
-                myDownloadLink.href = myTrimmedUrl;
-                myDownloadLink.download = 'trimmed_video_' + Date.now() + '.webm';
-                myDownloadLink.style.display = 'inline';
+                mySetDownloadLink(myTrimmedBlob, 'trimmed_video_');
                 
-                myRecordedVideo.src = myTrimmedUrl;
+                myRecordedVideo.src = URL.createObjectURL(myTrimmedBlob); // Update video player to show trimmed version
                 myTrimmingControls.style.display = 'none';
                 mySaveTrimmedButton.disabled = false;
                 mySaveTrimmedButton.textContent = '💾 Prep for Download Trimmed Video';
@@ -508,10 +551,18 @@
 
         function myCancelTrimming() {
             myTrimmingControls.style.display = 'none';
-            const myVideoUrl = URL.createObjectURL(myRecordedVideoBlob);
-            myDownloadLink.href = myVideoUrl;
-            myDownloadLink.download = 'webcam_recording_' + Date.now() + '.webm';
-            myDownloadLink.style.display = 'inline';
+            
+            // Reset the download link and video player to the full recorded/uploaded video blob
+            if (myRecordedVideoBlob) {
+                mySetDownloadLink(myRecordedVideoBlob, 'full_video_');
+                myRecordedVideo.src = URL.createObjectURL(myRecordedVideoBlob);
+            } else {
+                // Fallback for when there's no recording/upload
+                myRecordedVideo.style.display = 'none';
+                myDownloadLink.href = '#';
+                myDownloadLink.textContent = 'Download Video';
+                myDownloadLink.style.backgroundColor = '#6c757d';
+            }
         }
 
         // --- Video Merging Functions ---
@@ -680,14 +731,21 @@
         myLoadSupportedFormats();
         myGetCameras();
         
+        // Initial setup for the main download link (always visible, but initially disabled/grey)
+        myDownloadLink.textContent = 'Ready for action';
+        myDownloadLink.href = '#';
+        myDownloadLink.style.backgroundColor = '#6c757d';
+
+
+        // Event listeners
         myCameraSelect.onchange = function() {
             myChangeCamera(this.value);
         };
-        
+
         myResolutionSelect.onchange = function() {
             myChangeCamera(myCameraSelect.value);
         };
-        
+
         myPhotoButton.onclick = myTakePhoto;
         myRecordButton.onclick = myToggleRecording;
 
