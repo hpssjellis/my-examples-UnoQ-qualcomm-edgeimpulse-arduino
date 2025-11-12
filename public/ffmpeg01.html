@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>FFmpeg WASM Demo</title>
+</head>
+<body>
+  <h2>Transcode Video to MP4</h2>
+  <input type="file" id="uploader" accept="video/*">
+  <button id="convertBtn">Convert</button>
+  <p id="status">Status: Idle</p>
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+  <script>
+    const { createFFmpeg, fetchFile } = FFmpegUtil;
+    const ffmpeg = createFFmpeg({ log: true });
+
+    document.getElementById('convertBtn').onclick = async () => {
+      const fileInput = document.getElementById('uploader');
+      const status = document.getElementById('status');
+
+      if (!fileInput.files.length) {
+        alert('Please select a video file first.');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      status.textContent = 'Status: Loading FFmpeg...';
+
+      if (!ffmpeg.isLoaded()) {
+        await ffmpeg.load();
+      }
+
+      status.textContent = 'Status: Transcoding...';
+      ffmpeg.FS('writeFile', 'input.webm', await fetchFile(file));
+      await ffmpeg.run('-i', 'input.webm', 'output.mp4');
+      const data = ffmpeg.FS('readFile', 'output.mp4');
+
+      const videoURL = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+      const video = document.createElement('video');
+      video.src = videoURL;
+      video.controls = true;
+      document.body.appendChild(video);
+
+      status.textContent = 'Status: Done!';
+    };
+  </script>
+</body>
+</html>
