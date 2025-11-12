@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple FFmpeg Format Converter Test</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            max-width: 600px; 
+            margin: 50px auto; 
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #333; 
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-group { 
+            margin: 20px 0;
+        }
+        label { 
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button { 
+            width: 100%;
+            padding: 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status { 
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.loading { background: #fff3cd; color: #856404; }
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 FFmpeg Converter Test</h1>
+        
+        <div id="status" class="status info">Initializing FFmpeg...</div>
+
+        <div class="input-group">
+            <label for="fileInput">Select Video File:</label>
+            <input type="file" id="fileInput" accept="video/*,audio/*" />
+        </div>
+
+        <div class="input-group">
+            <label for="formatSelect">Convert To:</label>
+            <select id="formatSelect">
+                <option value="mp4">MP4 (H.264)</option>
+                <option value="webm">WebM</option>
+                <option value="avi">AVI</option>
+                <option value="mov">MOV</option>
+                <option value="mkv">MKV</option>
+                <option value="mp3">MP3 (audio only)</option>
+                <option value="wav">WAV (audio only)</option>
+            </select>
+        </div>
+
+        <button id="convertBtn" disabled>Convert File</button>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    
+    <script>
+        const { FFmpeg } = FFmpegWASM;
+        const { fetchFile, toBlobURL } = FFmpegUtil;
+
+        const ffmpeg = new FFmpeg();
+        const statusDiv = document.getElementById('status');
+        const fileInput = document.getElementById('fileInput');
+        const formatSelect = document.getElementById('formatSelect');
+        const convertBtn = document.getElementById('convertBtn');
+        const logDiv = document.getElementById('log');
+
+        let isLoaded = false;
+
+        // Show logs
+        ffmpeg.on('log', ({ message }) => {
+            console.log(message);
+            logDiv.style.display = 'block';
+            logDiv.innerHTML += message + '<br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        });
+
+        // Show progress
+        ffmpeg.on('progress', ({ progress, time }) => {
+            const percent = Math.round(progress * 100);
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = `Converting... ${percent}% (${time}s)`;
+        });
+
+        // Initialize FFmpeg
+        (async () => {
+            try {
+                statusDiv.className = 'status loading';
+                statusDiv.textContent = 'Loading FFmpeg WASM files...';
+                
+                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+                
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+                });
+                
+                isLoaded = true;
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✓ FFmpeg loaded successfully! Select a file to convert.';
+                convertBtn.disabled = false;
+                
+                console.log('FFmpeg loaded successfully!');
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ Failed to load FFmpeg: ' + error.message;
+                console.error('FFmpeg load error:', error);
+            }
+        })();
+
+        // Convert function
+        convertBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file first!');
+                return;
+            }
+
+            if (!isLoaded) {
+                alert('FFmpeg is not loaded yet. Please wait.');
+                return;
+            }
+
+            convertBtn.disabled = true;
+            logDiv.innerHTML = '';
+            logDiv.style.display = 'block';
+
+            const outputFormat = formatSelect.value;
+            const inputName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
+            const outputName = 'output.' + outputFormat;
+
+            try {
+                statusDiv.className = 'status loading';
+                statusDiv.textContent = 'Writing input file...';
+
+                // Write input file
+                await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+                statusDiv.textContent = 'Converting...';
+
+                // Convert based on format
+                let command;
+                if (outputFormat === 'mp4') {
+                    command = ['-i', inputName, '-c:v', 'libx264', '-c:a', 'aac', outputName];
+                } else if (outputFormat === 'mp3') {
+                    command = ['-i', inputName, '-vn', '-c:a', 'libmp3lame', outputName];
+                } else if (outputFormat === 'wav') {
+                    command = ['-i', inputName, '-vn', '-c:a', 'pcm_s16le', outputName];
+                } else {
+                    // For other formats, use copy codec for speed
+                    command = ['-i', inputName, '-c', 'copy', outputName];
+                }
+
+                await ffmpeg.exec(command);
+
+                statusDiv.textContent = 'Reading output file...';
+
+                // Read output file
+                const data = await ffmpeg.readFile(outputName);
+                
+                // Create download
+                const mimeTypes = {
+                    'mp4': 'video/mp4',
+                    'webm': 'video/webm',
+                    'avi': 'video/x-msvideo',
+                    'mov': 'video/quicktime',
+                    'mkv': 'video/x-matroska',
+                    'mp3': 'audio/mpeg',
+                    'wav': 'audio/wav'
+                };
+
+                const blob = new Blob([data], { type: mimeTypes[outputFormat] });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'converted_' + Date.now() + '.' + outputFormat;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✓ Conversion complete! File downloaded.';
+
+                // Cleanup
+                await ffmpeg.deleteFile(inputName);
+                await ffmpeg.deleteFile(outputName);
+
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ Conversion failed: ' + error.message;
+                console.error('Conversion error:', error);
+            }
+
+            convertBtn.disabled = false;
+        });
+    </script>
+</body>
+</html>
