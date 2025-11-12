@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Webcam Recorder with Trimming & Merging</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; margin-top: 20px;">
+
+  <h1>Webcam Capture and Recorder</h1>
+
+  <video id="myLiveStreamVideo" autoplay playsinline style="display: none;"></video>
+  <canvas id="myVideoCanvas" width="640" height="480" style="border: 2px solid #ccc;"></canvas>
+  <video id="myRecordedVideo" controls style="display: none; border: 2px solid green;"></video>
+  <a id="myDownloadLink" style="display: none;">Download Video</a>
+
+  <div>
+    <select id="myCameraSelect" onchange="myChangeCamera(this.value)">
+      <option>Loading Cameras...</option>
+    </select>
+    <select id="myResolutionSelect" onchange="myChangeCamera(myCameraSelect.value)">
+      <option>Loading Resolutions...</option>
+    </select>
+    <select id="myFormatSelect" disabled>
+      <option>Loading Formats...</option>
+    </select>
+    <button id="myPhotoButton" onclick="myTakePhoto()" disabled>📸 Take Photo</button>
+    <button id="myRecordButton" onclick="myToggleRecording()" disabled>🔴 Start Recording</button>
+  </div>
+
+  <hr>
+
+  <div>
+    <h3>Trim & Merge Tools</h3>
+    <label>Start Time (s): <input type="number" id="startTime" value="0" min="0"></label>
+    <label>End Time (s): <input type="number" id="endTime" value="5" min="0"></label>
+    <button onclick="trimPlayback()">▶️ Trim & Play</button>
+    <button onclick="saveClip()">💾 Save Clip</button>
+    <button onclick="mergeClips()">🔗 Merge Clips</button>
+    <br><br>
+    <label>Load Saved Clip:
+      <select id="clipSelector">
+        <option value="">-- Select Clip --</option>
+      </select>
+    </label>
+    <button onclick="loadSelectedClip()">📂 Load Clip</button>
+  </div>
+
+  <script>
+    const myLiveStreamVideo = document.getElementById('myLiveStreamVideo');
+    const myVideoCanvas = document.getElementById('myVideoCanvas');
+    const myRecordedVideo = document.getElementById('myRecordedVideo');
+    const myCameraSelect = document.getElementById('myCameraSelect');
+    const myResolutionSelect = document.getElementById('myResolutionSelect');
+    const myFormatSelect = document.getElementById('myFormatSelect');
+    const myPhotoButton = document.getElementById('myPhotoButton');
+    const myRecordButton = document.getElementById('myRecordButton');
+    const myDownloadLink = document.getElementById('myDownloadLink');
+    const myCanvasContext = myVideoCanvas.getContext('2d');
+
+    let myCurrentStream = null;
+    let myMediaRecorder = null;
+    let myRecordedChunks = [];
+    let myIsRecording = false;
+    const myRecordedClips = [];
+
+    function myLoadResolutionPresets() {
+      const presets = [
+        { width: 1280, height: 720, name: 'HD (720p)' },
+        { width: 640, height: 480, name: 'VGA (480p)' },
+        { width: 320, height: 240, name: 'QVGA (240p)' },
+        { width: 1920, height: 1080, name: 'Full HD (1080p)' }
+      ];
+      myResolutionSelect.innerHTML = '';
+      for (const preset of presets) {
+        const opt = document.createElement('option');
+        opt.value = `${preset.width}x${preset.height}`;
+        opt.textContent = preset.name;
+        myResolutionSelect.appendChild(opt);
+      }
+      myResolutionSelect.value = '640x480';
+    }
+
+    function myLoadSupportedFormats() {
+      const formats = [
+        { mime: 'video/webm; codecs=vp9,opus', name: 'WebM (High Quality)' },
+        { mime: 'video/webm; codecs=vp8,opus', name: 'WebM (Standard)' },
+        { mime: 'video/webm', name: 'WebM (Default)' }
+      ];
+      myFormatSelect.innerHTML = '';
+      for (const format of formats) {
+        if (MediaRecorder.isTypeSupported(format.mime)) {
+          const opt = document.createElement('option');
+          opt.value = format.mime;
+          opt.textContent = format.name;
+          myFormatSelect.appendChild(opt);
+        }
+      }
+      myFormatSelect.disabled = false;
+    }
+
+    async function myGetCameras() {
+      await myRequestMediaPermission();
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      myCameraSelect.innerHTML = '';
+      for (const device of devices) {
+        if (device.kind === 'videoinput') {
+          const opt = document.createElement('option');
+          opt.value = device.deviceId;
+          opt.textContent = device.label || 'Camera';
+          myCameraSelect.appendChild(opt);
+        }
+      }
+      if (myCameraSelect.options.length > 0) {
+        myChangeCamera(myCameraSelect.value);
+      }
+    }
+
+    async function myRequestMediaPermission() {
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      tempStream.getTracks().forEach(track => track.stop());
+    }
+
+    function myStopCurrentStream() {
+      if (myCurrentStream) {
+        myCurrentStream.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    async function myChangeCamera(deviceId) {
+      myStopCurrentStream();
+      const [width, height] = myResolutionSelect.value.split('x').map(Number);
+      const constraints = {
+        audio: true,
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: width },
+          height: { ideal: height }
+        }
+      };
+      try {
+        myCurrentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        myLiveStreamVideo.srcObject = myCurrentStream;
+        myLiveStreamVideo.muted = true;
+        myLiveStreamVideo.onloadedmetadata = () => {
+          myLiveStreamVideo.play();
+          myVideoCanvas.width = myLiveStreamVideo.videoWidth;
+          myVideoCanvas.height = myLiveStreamVideo.videoHeight;
+          myDrawLoop();
+          myPhotoButton.disabled = false;
+          myRecordButton.disabled = false;
+        };
+      } catch (err) {
+        alert("Camera error: " + err);
+      }
+    }
+
+    function myDrawLoop() {
+      if (myLiveStreamVideo.paused || myLiveStreamVideo.ended) return;
+      myCanvasContext.drawImage(myLiveStreamVideo, 0, 0, myVideoCanvas.width, myVideoCanvas.height);
+      requestAnimationFrame(myDrawLoop);
+    }
+
+    function myTakePhoto() {
+      const url = myVideoCanvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'photo_' + Date.now() + '.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function myToggleRecording() {
+      if (myIsRecording) {
+        myStopRecording();
+      } else {
+        myStartRecording();
+      }
+    }
+
+    function myStartRecording() {
+      if (!myCurrentStream) return;
+      const mime = myFormatSelect.value;
+      myMediaRecorder = new MediaRecorder(myCurrentStream, { mimeType: mime });
+      myRecordedChunks = [];
+      myMediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) myRecordedChunks.push(e.data);
+      };
+      myMediaRecorder.onstop = myHandleRecordingStop;
+      myMediaRecorder.start();
+      myIsRecording = true;
+      myRecordButton.innerText = '⏹️ Stop Recording';
+    }
+
+    function myStopRecording() {
+      if (myMediaRecorder && myMediaRecorder.state !== 'inactive') {
+        myMediaRecorder.stop();
+      }
+      myIsRecording = false;
+      myRecordButton.innerText = '🔴 Start Recording';
+    }
+
+    function myHandleRecordingStop() {
+      const blob = new Blob(myRecordedChunks, { type: myMediaRecorder.mimeType });
+      const url = URL.createObjectURL(blob);
+      myRecordedVideo.src = url;
+      myRecordedVideo.style.display = 'block';
+      myDownloadLink.href = url;
+      myDownloadLink.download = 'recording_' + Date.now() + '.webm';
+      myDownloadLink.style.display = 'inline';
+    }
+
+    function trimPlayback() {
+  const start = parseFloat(document.getElementById('startTime').value);
+  const end = parseFloat(document.getElementById('endTime').value);
+  if (isNaN(start) || isNaN(end) || start >= end) {
+    alert("Invalid start/end times.");
+    return;
+  }
+
+  myRecordedVideo.currentTime = start;
+  myRecordedVideo.play();
+  myRecordedVideo.ontimeupdate = () => {
+    if (myRecordedVideo.currentTime >= end) {
+      myRecordedVideo.pause();
+      myRecordedVideo.ontimeupdate = null;
+    }
+  };
+}
+
+function saveClip() {
+  if (!myRecordedChunks.length) {
+    alert("No recording to save.");
+    return;
+  }
+
+  const clipBlob = new Blob([...myRecordedChunks], { type: myMediaRecorder.mimeType });
+  myRecordedClips.push(clipBlob);
+  updateClipSelector();
+  alert("Clip saved! Total clips: " + myRecordedClips.length);
+}
+
+function updateClipSelector() {
+  const selector = document.getElementById('clipSelector');
+  selector.innerHTML = '<option value="">-- Select Clip --</option>';
+  myRecordedClips.forEach((_, i) => {
+    const option = document.createElement('option');
+    option.value = i;
+    option.textContent = `Clip ${i + 1}`;
+    selector.appendChild(option);
+  });
+}
+
+function loadSelectedClip() {
+  const index = parseInt(document.getElementById('clipSelector').value);
+  if (isNaN(index) || index >= myRecordedClips.length) {
+    alert("Please select a valid clip.");
+    return;
+  }
+
+  const blob = myRecordedClips[index];
+  const url = URL.createObjectURL(blob);
+  myRecordedVideo.src = url;
+  myRecordedVideo.style.display = 'block';
+  myDownloadLink.href = url;
+  myDownloadLink.download = `saved_clip_${index + 1}.webm`;
+  myDownloadLink.style.display = 'inline';
+}
+
+async function mergeClips() {
+  if (myRecordedClips.length < 2) {
+    alert("Need at least 2 clips to merge.");
+    return;
+  }
+
+  const mergeVideo = document.createElement('video');
+  mergeVideo.style.display = 'none';
+  document.body.appendChild(mergeVideo);
+
+  const stream = mergeVideo.captureStream();
+  const recorder = new MediaRecorder(stream);
+  const mergedChunks = [];
+
+  recorder.ondataavailable = e => mergedChunks.push(e.data);
+  recorder.onstop = () => {
+    const mergedBlob = new Blob(mergedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(mergedBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'merged_clips.webm';
+    a.click();
+    document.body.removeChild(mergeVideo);
+  };
+
+  recorder.start();
+
+  for (const clip of myRecordedClips) {
+    mergeVideo.src = URL.createObjectURL(clip);
+    await mergeVideo.play();
+    await new Promise(resolve => mergeVideo.onended = resolve);
+  }
+
+  recorder.stop();
+}
+
+// Initialize on page load
+myLoadResolutionPresets();
+myLoadSupportedFormats();
+myGetCameras();
+  </script>
+</body>
+</html>
+
+          
