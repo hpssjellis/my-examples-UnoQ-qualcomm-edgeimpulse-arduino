@@ -90,3 +90,40 @@ sudo apt install terminator
 
 ```
 
+## To load x11vnc server
+
+```
+sudo apt update
+sudo apt install x11vnc
+```
+
+
+```
+x11vnc -storepasswd
+```
+
+Make a bash file to run it
+```
+nano run-x11vnc.sh
+```
+and paste this and save it cntl-x, y,
+```
+#1/bin/bash
+x11vnc -display :0 -auth guess -loop -forever -multiptr -rfbauth ~/.vnc/passwd -noxdamage -xkb -shared
+```
+Then make that file runable by 
+```
+chmod +x run-x11vnc.sh
+```
+
+
+To find the vnc IP address is a bit tricky try
+```
+hostname -I
+```
+
+or
+
+```
+ip route get 1.1.1.1 | awk '{print $7; exit}'
+```
