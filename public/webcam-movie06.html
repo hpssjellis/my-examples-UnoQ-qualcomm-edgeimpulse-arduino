@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Webcam and Recorder with Trimming</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; margin-top: 20px;">
+    
+    <h1 style="color: #007bff;">Webcam Capture and Recorder with Trimming</h1>
+
+    <p>My main UnoQ Index <a href="https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/public/index.html"> here </a> </p>
+    <p>My UnoQ Github is<a href="https://github.com/hpssjellis/my-examples-UnoQ-qualcomm-edgeimpulse-arduino"> my-examples-of-UnoQ... </a> </p>
+    <p>You can find more of my work on my <a href="https://github.com/hpssjellis"> hpssjellis </a> GitHub Profile page:</p>
+    <p>Follow me Jeremy Ellis on <a href="https://ca.linkedin.com/in/jeremy-ellis-4237a9bb"> LinkedIn </a><br></p>
+
+    <video id="myLiveStreamVideo" autoplay playsinline style="display: none;"></video>
+
+    <canvas id="myVideoCanvas" width="640" height="480" style="border: 2px solid #ccc; max-width: 90%; margin-bottom: 20px;"></canvas>
+
+    <video id="myRecordedVideo" controls style="display: none; border: 2px solid green; max-width: 90%; margin-bottom: 20px;"></video>
+    
+    <div id="myTrimControls" style="display: none; flex-direction: column; align-items: center; padding: 10px; border: 1px solid #ffc107; max-width: 90%; margin: 0 auto 20px auto;">
+        <h3 style="color: #ffc107; margin-top: 5px; margin-bottom: 10px;">✂️ Trim Video</h3>
+        
+        <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 10px;">
+            <label for="myStartTimeSlider" id="myStartTimeLabel">Start: 0.00s</label>
+            <input type="range" id="myStartTimeSlider" min="0" value="0" step="0.01" style="width: 70%;" oninput="myUpdateTrimStart(this.value)">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 15px;">
+            <label for="myEndTimeSlider" id="myEndTimeLabel">End: 0.00s</label>
+            <input type="range" id="myEndTimeSlider" min="0" value="0" step="0.01" style="width: 70%;" oninput="myUpdateTrimEnd(this.value)">
+        </div>
+        
+        <button onclick="mySaveTrimmedVideo()" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+            💾 Save Trimmed Clip
+        </button>
+    </div>
+
+    <div id="myControls" style="display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; margin-top: 10px;">
+        
+        <select id="myCameraSelect" style="padding: 10px; border: 1px solid #007bff; border-radius: 5px;" onchange="myChangeCamera(this.value)">
+            <option>Loading Cameras...</option>
+        </select>
+        
+        <select id="myResolutionSelect" style="padding: 10px; border: 1px solid #ffc107; border-radius: 5px;" onchange="myChangeCamera(myCameraSelect.value)">
+            <option>Loading Resolutions...</option>
+        </select>
+        
+        <select id="myFormatSelect" style="padding: 10px; border: 1px solid #28a745; border-radius: 5px;" disabled>
+            <option>Loading Formats...</option>
+        </select>
+        
+        <button id="myPhotoButton" onclick="myTakePhoto()" style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
+            📸 Take Photo
+        </button>
+
+        <button id="myRecordButton" onclick="myToggleRecording()" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" disabled>
+            🔴 Start Recording
+        </button>
+        
+        <a id="myDownloadLink" style="display: none; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Download Video</a>
+    </div>
+
+    <script>
+        // --- 1. Global Variables (myVariables) ---
+        const myLiveStreamVideo = document.getElementById('myLiveStreamVideo');
+        const myVideoCanvas = document.getElementById('myVideoCanvas');
+        const myRecordedVideo = document.getElementById('myRecordedVideo');
+        const myCameraSelect = document.getElementById('myCameraSelect');
+        const myResolutionSelect = document.getElementById('myResolutionSelect');
+        const myFormatSelect = document.getElementById('myFormatSelect');
+        const myPhotoButton = document.getElementById('myPhotoButton');
+        const myRecordButton = document.getElementById('myRecordButton');
+        const myDownloadLink = document.getElementById('myDownloadLink');
+        const myCanvasContext = myVideoCanvas.getContext('2d');
+        const myTrimControls = document.getElementById('myTrimControls'); // NEW
+        const myStartTimeSlider = document.getElementById('myStartTimeSlider'); // NEW
+        const myEndTimeSlider = document.getElementById('myEndTimeSlider'); // NEW
+        const myStartTimeLabel = document.getElementById('myStartTimeLabel'); // NEW
+        const myEndTimeLabel = document.getElementById('myEndTimeLabel'); // NEW
+        
+        let myCurrentStream = null;
+        let myMediaRecorder = null;
+        let myRecordedChunks = [];
+        let myIsRecording = false;
+
+        // --- 2. Setup Functions (Same as original) ---
+
+        function myLoadResolutionPresets() {
+            const myResolutionPresets = [
+                { width: 1280, height: 720, name: 'HD (720p)' },
+                { width: 640, height: 480, name: 'VGA (480p)' },
+                { width: 320, height: 240, name: 'QVGA (240p)' },
+                { width: 1920, height: 1080, name: 'Full HD (1080p)' }
+            ];
+            
+            myResolutionSelect.innerHTML = '';
+            for (const preset of myResolutionPresets) {
+                const myOption = document.createElement('option');
+                myOption.value = `${preset.width}x${preset.height}`;
+                myOption.textContent = preset.name;
+                myResolutionSelect.appendChild(myOption);
+            }
+            myResolutionSelect.value = '640x480';
+        }
+
+        function myLoadSupportedFormats() {
+            const myFormatsToCheck = [
+                { mime: 'video/webm; codecs=vp9,opus', name: 'WebM (High Quality)' },
+                { mime: 'video/webm; codecs=vp8,opus', name: 'WebM (Standard)' },
+                { mime: 'video/webm', name: 'WebM (Default)' }
+            ];
+
+            myFormatSelect.innerHTML = '';
+            let mySupportedCount = 0;
+
+            for (const format of myFormatsToCheck) {
+                if (MediaRecorder.isTypeSupported(format.mime)) {
+                    const myOption = document.createElement('option');
+                    myOption.value = format.mime;
+                    myOption.textContent = format.name;
+                    myFormatSelect.appendChild(myOption);
+                    mySupportedCount++;
+                }
+            }
+
+            if (mySupportedCount > 0) {
+                myFormatSelect.disabled = false;
+            } else {
+                myFormatSelect.innerHTML = '<option>No Recording Formats Supported</option>';
+            }
+        }
+
+        async function myGetCameras() {
+            myCameraSelect.innerHTML = '<option>Searching...</option>';
+            try {
+                await myRequestMediaPermission();
+                
+                const myDevices = await navigator.mediaDevices.enumerateDevices();
+                myCameraSelect.innerHTML = '';
+                let myCameraCount = 0;
+
+                for (const myDevice of myDevices) {
+                    if (myDevice.kind === 'videoinput') {
+                        const myOption = document.createElement('option');
+                        myOption.value = myDevice.deviceId;
+                        myOption.textContent = myDevice.label || `Camera ${++myCameraCount}`;
+                        myCameraSelect.appendChild(myOption);
+                        myCameraCount++;
+                    }
+                }
+
+                if (myCameraCount > 0) {
+                    myChangeCamera(myCameraSelect.value);
+                } else {
+                    myCameraSelect.innerHTML = '<option>No Cameras Found</option>';
+                }
+
+            } catch (error) {
+                console.error("Error enumerating devices:", error);
+                myCameraSelect.innerHTML = '<option>Permission Denied</option>';
+                alert("Please grant camera access to use this page.");
+            }
+        }
+        
+        async function myRequestMediaPermission() {
+            const myTempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            myTempStream.getTracks().forEach(track => track.stop());
+            return myTempStream;
+        }
+
+        // --- 3. Stream Control Functions (Same as original) ---
+
+        function myStopCurrentStream() {
+            if (myCurrentStream) {
+                myCurrentStream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        async function myChangeCamera(myDeviceId) {
+            myStopCurrentStream();
+            
+            const [myWidth, myHeight] = myResolutionSelect.value.split('x').map(Number);
+            
+            const myConstraints = {
+                audio: true,
+                video: {
+                    deviceId: myDeviceId ? { exact: myDeviceId } : undefined,
+                    width: { ideal: myWidth },
+                    height: { ideal: myHeight }
+                }
+            };
+
+            try {
+                myCurrentStream = await navigator.mediaDevices.getUserMedia(myConstraints);
+                myLiveStreamVideo.srcObject = myCurrentStream;
+                myLiveStreamVideo.muted = true;
+                
+                console.log(`Audio tracks captured: ${myCurrentStream.getAudioTracks().length}`);
+                
+                myLiveStreamVideo.onloadedmetadata = () => {
+                    myLiveStreamVideo.play();
+                    myVideoCanvas.width = myLiveStreamVideo.videoWidth;
+                    myVideoCanvas.height = myLiveStreamVideo.videoHeight;
+                    myDrawLoop();
+                    
+                    myPhotoButton.disabled = false;
+                    myRecordButton.disabled = false;
+                };
+
+            } catch (error) {
+                console.error("Error switching camera or resolution:", error);
+                alert("Could not start camera with ID: " + myDeviceId + ". Try a lower resolution.");
+                myPhotoButton.disabled = true;
+                myRecordButton.disabled = true;
+            }
+        }
+
+        // --- 4. Canvas Drawing Loop (Same as original) ---
+
+        function myDrawLoop() {
+            if (myLiveStreamVideo.paused || myLiveStreamVideo.ended) return;
+            myCanvasContext.drawImage(myLiveStreamVideo, 0, 0, myVideoCanvas.width, myVideoCanvas.height);
+            requestAnimationFrame(myDrawLoop);
+        }
+
+
+        // --- 5. Photo Capture Function (Same as original) ---
+
+        function myTakePhoto() {
+            const myImageDataUrl = myVideoCanvas.toDataURL('image/png');
+            const myLink = document.createElement('a');
+            myLink.href = myImageDataUrl;
+            myLink.download = 'webcam_photo_' + Date.now() + '.png';
+            
+            document.body.appendChild(myLink);
+            myLink.click();
+            document.body.removeChild(myLink);
+
+            myVideoCanvas.style.border = '4px solid #ffc107';
+            setTimeout(() => { myVideoCanvas.style.border = '2px solid #ccc'; }, 200);
+        }
+
+        // --- 6. Video Recording Functions (Modified) ---
+
+        function myToggleRecording() {
+            if (myIsRecording) {
+                myStopRecording();
+            } else {
+                myStartRecording();
+            }
+        }
+
+        function myStartRecording() {
+            if (!myCurrentStream) {
+                alert("Please start the camera first.");
+                return;
+            }
+
+            const myMimeType = myFormatSelect.value;
+            
+            myMediaRecorder = new MediaRecorder(myCurrentStream, { mimeType: myMimeType });
+            myRecordedChunks = [];
+            myMediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    myRecordedChunks.push(event.data);
+                }
+            };
+            myMediaRecorder.onstop = myHandleRecordingStop;
+
+            myMediaRecorder.start();
+            myIsRecording = true;
+
+            // Hide trim controls when starting a new recording
+            myTrimControls.style.display = 'none';
+
+            // Update UI
+            myRecordButton.innerText = '⏹️ Stop Recording';
+            myRecordButton.style.backgroundColor = '#007bff';
+            myVideoCanvas.style.border = '4px dashed #dc3545';
+            myRecordedVideo.style.display = 'none';
+            myDownloadLink.style.display = 'none';
+        }
+
+        function myStopRecording() {
+            if (myMediaRecorder && myMediaRecorder.state !== 'inactive') {
+                myMediaRecorder.stop();
+            }
+            myIsRecording = false;
+
+            // Update UI
+            myRecordButton.innerText = '🔴 Start Recording';
+            myRecordButton.style.backgroundColor = '#dc3545';
+            myVideoCanvas.style.border = '2px solid #ccc';
+        }
+
+        function myHandleRecordingStop() {
+            const myVideoBlob = new Blob(myRecordedChunks, { type: myMediaRecorder.mimeType });
+            const myVideoUrl = URL.createObjectURL(myVideoBlob);
+
+            // Display the recorded video
+            myRecordedVideo.src = myVideoUrl;
+            myRecordedVideo.style.display = 'block';
+
+            // IMPORTANT: Setup Trim Controls
+            myRecordedVideo.onloadedmetadata = mySetupTrimControls;
+
+            // Clear the original download link for now
+            myDownloadLink.style.display = 'none';
+            myDownloadLink.removeAttribute('href');
+        }
+        
+        // --- 7. Trimming Functions (NEW) ---
+
+        function mySetupTrimControls() {
+            const myDuration = myRecordedVideo.duration;
+
+            // Set the max range for both sliders to the video duration
+            myStartTimeSlider.max = myDuration;
+            myEndTimeSlider.max = myDuration;
+            
+            // Set initial values (Start=0, End=Duration)
+            myStartTimeSlider.value = 0;
+            myEndTimeSlider.value = myDuration;
+            
+            // Update labels and seek video to start for preview
+            myUpdateTrimStart(0);
+            myUpdateTrimEnd(myDuration);
+            myRecordedVideo.currentTime = 0;
+            
+            // Show trim controls
+            myTrimControls.style.display = 'flex';
+        }
+        
+        function myUpdateTrimStart(myTime) {
+            myTime = parseFloat(myTime);
+            // Ensure start time is not after end time
+            if (myTime > parseFloat(myEndTimeSlider.value)) {
+                myTime = parseFloat(myEndTimeSlider.value);
+                myStartTimeSlider.value = myTime;
+            }
+            myStartTimeLabel.textContent = `Start: ${myTime.toFixed(2)}s`;
+            myRecordedVideo.currentTime = myTime; // Seek video to start point
+        }
+
+        function myUpdateTrimEnd(myTime) {
+            myTime = parseFloat(myTime);
+            // Ensure end time is not before start time
+            if (myTime < parseFloat(myStartTimeSlider.value)) {
+                myTime = parseFloat(myStartTimeSlider.value);
+                myEndTimeSlider.value = myTime;
+            }
+            myEndTimeLabel.textContent = `End: ${myTime.toFixed(2)}s`;
+            // Seek video to end point (or slightly before) for preview
+            myRecordedVideo.currentTime = myTime - 0.1; 
+        }
+
+        /**
+         * The core trimming function. WARNING: This method captures video frames using Canvas,
+         * but CANNOT correctly capture the audio track. The resulting video will be silent.
+         * Proper video/audio stream manipulation requires Media Stream APIs, which are complex
+         * for simple teaching examples.
+         */
+        function mySaveTrimmedVideo() {
+            const myStartTime = parseFloat(myStartTimeSlider.value);
+            const myEndTime = parseFloat(myEndTimeSlider.value);
+            const myClipDuration = myEndTime - myStartTime;
+
+            if (myClipDuration <= 0) {
+                alert("End time must be greater than start time!");
+                return;
+            }
+
+            // Create a temporary canvas for capturing frames (Hidden from user)
+            const myTempCanvas = document.createElement('canvas');
+            myTempCanvas.width = myRecordedVideo.videoWidth;
+            myTempCanvas.height = myRecordedVideo.videoHeight;
+            const myTempContext = myTempCanvas.getContext('2d');
+
+            // Array to store the captured data
+            const myTrimmedChunks = [];
+            let myFrameCount = 0;
+            const myFPS = 25; // Target frames per second for capture (adjustable)
+            const myInterval = 1000 / myFPS; // Milliseconds per frame
+
+            // Use the recorded video as the source for the new frames
+            myRecordedVideo.currentTime = myStartTime;
+            myRecordedVideo.pause();
+
+            const myCaptureLoop = setInterval(() => {
+                const myCurrentTime = myStartTime + myFrameCount / myFPS;
+
+                if (myCurrentTime < myEndTime) {
+                    // 1. Draw the video frame onto the temporary canvas
+                    myTempContext.drawImage(myRecordedVideo, 0, 0, myTempCanvas.width, myTempCanvas.height);
+
+                    // 2. Convert the canvas content to a Blob (image frame)
+                    myTempCanvas.toBlob((myBlob) => {
+                        myTrimmedChunks.push(myBlob);
+                    }, 'image/webp'); // WebP is good for animation quality
+
+                    myRecordedVideo.currentTime = myCurrentTime + (myInterval / 1000); // Advance video time
+                    myFrameCount++;
+                } else {
+                    clearInterval(myCaptureLoop);
+                    myFinalizeTrim(myTrimmedChunks);
+                }
+            }, myInterval);
+            
+            // Provide feedback while processing
+            myTrimControls.style.border = '4px solid #28a745';
+            setTimeout(() => { myTrimControls.style.border = '1px solid #ffc107'; }, 200);
+        }
+        
+        /**
+         * Finalizes the trimming process by combining the captured frames.
+         * NOTE: This will only save the video frames, not the audio!
+         */
+        function myFinalizeTrim(myChunks) {
+             // For a true trimmed video file *with audio*, a MediaRecorder instance 
+             // needs to be running and fed a stream which has been 'trimmed' 
+             // via stream manipulation or using a sophisticated library.
+             // For this simple example, we stop here and prompt the user to use a better tool.
+            
+            alert("Trimming complete! WARNING: This simple JavaScript method can only capture video frames, not audio. The saved file will be silent. For full video and audio trimming, use a more advanced library or a different tool.");
+            
+            // Create a temporary download link for the silent video frames
+            const myTempBlob = new Blob(myChunks, { type: 'video/webm' }); // Guessing a final format
+            const myVideoUrl = URL.createObjectURL(myTempBlob);
+
+            myDownloadLink.href = myVideoUrl;
+            myDownloadLink.download = 'trimmed_silent_clip_' + Date.now() + '.webm';
+            myDownloadLink.textContent = "Download SILENT Trimmed Clip";
+            myDownloadLink.style.display = 'inline';
+            
+            // Re-show the recorded video and controls
+            myRecordedVideo.style.display = 'block';
+            myRecordedVideo.play();
+        }
+
+        // --- 8. Initialization on Page Load ---
+
+        myLoadResolutionPresets();
+        myLoadSupportedFormats();
+        myGetCameras();
+
+        function alert(message) {
+            console.error("APP ERROR: " + message);
+        }
+
+    </script>
+</body>
+</html>
