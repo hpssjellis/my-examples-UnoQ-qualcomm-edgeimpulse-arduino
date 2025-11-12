@@ -40,7 +40,7 @@
         </div>
         
         <button id="mySaveTrimmedButton" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-right: 10px;">
-            💾 Save Trimmed Video
+            💾 Prep for Download Trimmed Video
         </button>
         
         <button id="myCancelTrimButton" style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
@@ -436,12 +436,12 @@
                 myRecordedVideo.src = myTrimmedUrl;
                 myTrimmingControls.style.display = 'none';
                 mySaveTrimmedButton.disabled = false;
-                mySaveTrimmedButton.textContent = '💾 Save Trimmed Video';
+                mySaveTrimmedButton.textContent = '💾 Prep for Download Trimmed Video';
                 
             } catch (error) {
                 console.error("Error trimming video:", error);
                 mySaveTrimmedButton.disabled = false;
-                mySaveTrimmedButton.textContent = '💾 Save Trimmed Video';
+                mySaveTrimmedButton.textContent = '💾 Prep for Download Trimmed Video';
             }
         }
 
