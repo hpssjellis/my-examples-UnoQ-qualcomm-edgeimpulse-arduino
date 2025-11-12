@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FFmpeg Format Converter Test</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; max-width: 500px; margin: auto; padding: 20px; }
+        h2 { color: #007bff; }
+        .myControlGroup { 
+            border: 1px solid #ccc; 
+            padding: 20px; 
+            border-radius: 5px; 
+            margin-bottom: 25px;
+        }
+        button { 
+            padding: 12px 25px; 
+            background-color: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            margin-top: 15px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .myStatus { 
+            padding: 10px; 
+            background-color: #f0f0f0; 
+            border-radius: 4px; 
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>FFmpeg Conversion Test: To MP4</h2>
+    
+    <div class="myStatus" id="myStatusMessage">Initializing...</div>
+
+    <div class="myControlGroup">
+        <label for="myFileInput">Select Video File to Convert:</label>
+        <input type="file" id="myFileInput" accept="video/*" onchange="myCheckFile()" />
+    </div>
+
+    <button onclick="myConvertAndSave()" id="myConvertButton" disabled>
+        ⚙️ Convert to MP4 and Save
+    </button>
+        
+    <script type="module">
+        // 1. IMPORT MODULES: ***FIXED CDN*** - Switched to cdn.jsdelivr.net for stability.
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/ffmpeg.js';
+        import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/util.js';
+
+        // 2. FFmpeg & Constants (Standard Names)
+        const ffmpeg = new FFmpeg();                 
+        // ***FIXED CDN*** - Use the stable jsdelivr path for the core files.
+        const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm'; 
+
+        // 3. UI Elements (Custom Names)
+        const myStatusDiv = document.getElementById('myStatusMessage');
+        const myFileInput = document.getElementById('myFileInput');
+        const myConvertButton = document.getElementById('myConvertButton');
+        
+        let isFFmpegLoaded = false; 
+
+        // Optional: Log output for debugging
+        ffmpeg.on('log', ({ message }) => {
+            console.log(message);
+        });
+
+        // --- Custom Functions ---
+
+        /**
+         * Checks if a file is selected to enable the button.
+         */
+        window.myCheckFile = function () {
+            if (myFileInput.files.length > 0 && isFFmpegLoaded) {
+                myConvertButton.disabled = false;
+                myStatusDiv.innerText = 'File selected. Ready to convert.';
+            } else {
+                myConvertButton.disabled = true;
+                if (!isFFmpegLoaded) {
+                     myStatusDiv.innerText = 'Initializing FFmpeg library in the background...';
+                }
+            }
+        }
+
+        /**
+         * Executes the FFmpeg conversion command and saves the resulting file.
+         */
+        window.myConvertAndSave = async function () {
+            myConvertButton.disabled = true;
+            
+            const inputFile = myFileInput.files[0];
+            const inputFileName = inputFile.name;
+            const outputFileName = 'converted_output_' + Date.now() + '.mp4';
+                        
+            if (!isFFmpegLoaded) {
+                myStatusDiv.innerText = 'Error: FFmpeg is not loaded correctly.';
+                myConvertButton.disabled = false;
+                return;
+            }
+
+            myStatusDiv.innerText = 'Writing file to virtual file system...';
+            try {
+                // 1. Write File to Virtual FS 
+                const fileData = await fetchFile(inputFile);
+                ffmpeg.FS('writeFile', inputFileName, fileData); 
+            } catch (error) {
+                myStatusDiv.innerText = `Error writing file: ${error.message}`;
+                myConvertButton.disabled = false;
+                return;
+            }
+            
+            myStatusDiv.innerText = 'Converting file... (This will take time)';
+            try {
+                // 2. Run the FFmpeg conversion command 
+                await ffmpeg.exec([
+                    '-i', inputFileName,
+                    '-c:v', 'libx264',
+                    '-preset', 'veryfast',
+                    '-crf', '23',
+                    outputFileName
+                ]);
+            } catch (error) {
+                myStatusDiv.innerText = `Error running conversion: ${error.message}`;
+                console.error(error);
+                myConvertButton.disabled = false;
+                return;
+            }
+            
+            myStatusDiv.innerText = 'Conversion complete. Preparing download...';
+            try {
+                // 3. Read Output and Download 
+                const convertedData = ffmpeg.FS('readFile', outputFileName);
+                
+                const movieBlob = new Blob([convertedData], { type: 'video/mp4' }); 
+                const downloadUrl = URL.createObjectURL(movieBlob); 
+                 
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = outputFileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+                myStatusDiv.innerText = 'Success! Your file has been converted and downloaded.';
+            } catch (error) {
+                myStatusDiv.innerText = `Error during download: ${error.message}`;
+                myConvertButton.disabled = false;
+                return;
+            }
+            
+            // 4. Cleanup 
+            try {
+                ffmpeg.FS('unlink', inputFileName);
+                ffmpeg.FS('unlink', outputFileName);
+            } catch (e) {
+                console.log('Cleanup error (non-critical):', e);
+            }                        
+            myConvertButton.disabled = false;        
+        }
+                
+        // --- Initialization (The reliable ES Module Fix) ---
+        (async () => {
+             myStatusDiv.innerText = 'Initializing FFmpeg library in the background...';
+                          
+             try {
+                // Load using the corrected jsdelivr core URLs
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
+                isFFmpegLoaded = true;
+                myStatusDiv.innerText = 'Ready. Select a video file.';
+                myCheckFile(); // Check if a file was selected during load
+             } catch (error) {
+                myStatusDiv.innerText = 'Error initializing FFmpeg. Please check the console for details.';
+                console.error("FFmpeg Initialization Error:", error);
+                myConvertButton.disabled = true;
+             }
+        })();
+    </script>
+</body>
+</html>
