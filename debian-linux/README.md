@@ -127,3 +127,17 @@ or
 ```
 ip route get 1.1.1.1 | awk '{print $7; exit}'
 ```
+
+
+
+
+I am trying a different editor
+```
+sudo apt update
+```
+```
+sudo app install geany
+```
+
+
+
