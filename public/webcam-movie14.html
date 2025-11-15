@@ -307,7 +307,8 @@
          //   if (myIsPaused) return;
             if (myLiveStreamVideo.paused || myLiveStreamVideo.ended) return;
             myCanvasContext.drawImage(myLiveStreamVideo, 0, 0, myVideoCanvas.width, myVideoCanvas.height);
-            myAnimationFrameId = requestAnimationFrame(myDrawLoop);
+          //  myAnimationFrameId = requestAnimationFrame(myDrawLoop);
+            requestAnimationFrame(myDrawLoop);
         }
 
         // --- Pause/Unpause Function ---
@@ -318,25 +319,18 @@ function myTogglePause() {
         return;
     }
     
-  //  myIsPaused = !myIsPaused;
-    
-    if (myIsPaused) {
+    if (myMediaRecorder && myMediaRecorder.state === 'recording') {
         // Pause the recording
-        if (myMediaRecorder && myMediaRecorder.state === 'recording') {
-            myMediaRecorder.pause();
-        }
+        myMediaRecorder.pause();
         myPauseButton.textContent = '▶️ Resume Recording';
         myPauseButton.style.backgroundColor = '#28a745';
         myVideoCanvas.style.border = '4px solid orange';
-    } else {
+    } else if (myMediaRecorder && myMediaRecorder.state === 'paused') {
         // Resume the recording
-        if (myMediaRecorder && myMediaRecorder.state === 'paused') {
-            myMediaRecorder.resume();
-        }
+        myMediaRecorder.resume();
         myPauseButton.textContent = '⏸️ Pause Recording';
         myPauseButton.style.backgroundColor = '#17a2b8';
         myVideoCanvas.style.border = '4px dashed #dc3545';
-        myDrawLoop(); // Make sure drawing continues
     }
 }
         // --- Photo Capture Function ---
