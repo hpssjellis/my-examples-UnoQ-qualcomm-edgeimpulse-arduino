@@ -307,7 +307,7 @@
             if (myIsPaused) return;
             if (myLiveStreamVideo.paused || myLiveStreamVideo.ended) return;
             myCanvasContext.drawImage(myLiveStreamVideo, 0, 0, myVideoCanvas.width, myVideoCanvas.height);
-      //      myAnimationFrameId = requestAnimationFrame(myDrawLoop);
+            myAnimationFrameId = requestAnimationFrame(myDrawLoop);
         }
 
         // --- Pause/Unpause Function ---
