@@ -160,7 +160,9 @@
         let myRecordedVideoBlob = null; // Stores the active video (webcam recording OR uploaded file)
         let myVideoDuration = 0;
         let myVideo1Blob = null;
-        let myVideo2Blob = null;
+        let myVideo2Blob = null;        
+        let myIsPaused = false;
+        let myAnimationFrameId = null;
 
         // --- Setup Functions ---
 
@@ -281,6 +283,7 @@
                     myLiveStreamVideo.play();
                     myVideoCanvas.width = myLiveStreamVideo.videoWidth;
                     myVideoCanvas.height = myLiveStreamVideo.videoHeight;
+                    myIsPaused = false;
                     myDrawLoop(); 
                     
                     myVideoCanvas.style.display = 'block'; // Ensure canvas is visible for live view
@@ -300,11 +303,11 @@
         }
 
         // --- Canvas Drawing Loop ---
-
         function myDrawLoop() {
+            if (myIsPaused) return;
             if (myLiveStreamVideo.paused || myLiveStreamVideo.ended) return;
             myCanvasContext.drawImage(myLiveStreamVideo, 0, 0, myVideoCanvas.width, myVideoCanvas.height);
-            requestAnimationFrame(myDrawLoop);
+            myAnimationFrameId = requestAnimationFrame(myDrawLoop);
         }
 
         // --- Pause/Unpause Function ---
