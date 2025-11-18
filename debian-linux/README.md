@@ -141,3 +141,11 @@ sudo app install geany
 
 
 
+# IPv4 errors
+
+there may be a better way to do this.
+```
+docker network prune
+
+```
+
