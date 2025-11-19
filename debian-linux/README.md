@@ -176,3 +176,16 @@ nmcli connection delete "mySSID"
 ```
 
 
+
+
+## Testing  (Change once tested. You still need a wifi password, but the app shouldn't stop to try to download the updates.)
+
+arduino-cli.yaml
+
+```
+# ... (existing content)
+network:
+  cloud_api:
+    skip_board_detection_calls: true
+# ... (existing content)
+```
