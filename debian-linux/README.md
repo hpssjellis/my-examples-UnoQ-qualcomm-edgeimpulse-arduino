@@ -152,6 +152,17 @@ docker network prune
 Then reboot the system.
 
 
+# Checking network SSID
 
+```
+nmcli connection show | grep "wifi"
+
+```
+
+## To delete an SSID
+
+```
+nmcli connection delete "mySSID"
+```
 
 
