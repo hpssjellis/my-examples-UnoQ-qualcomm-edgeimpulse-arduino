@@ -189,3 +189,13 @@ network:
     skip_board_detection_calls: true
 # ... (existing content)
 ```
+### but now unless you change the above it will not update applab.
+These steps should give you some power
+
+```
+sudo apt update
+sudo apt upgrade arduino-app-lab
+
+```
+
+there are other upgrade commands but this one does a lot.
