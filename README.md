@@ -4,6 +4,10 @@
 
 Started Oct 24, 2025
 
+# DO NOT DOWNLOAD THE ENTIRE REPOSITORY ON THE UNOQ. IT IS TOO BIG!
+
+Download [.zipped edgeImpulse models](edgeimpulse/full-applab-models/) or copy working code to the unoQ
+
 I am trying to decide if I should make a maker100 Course based on the UnoQ. My curriculum is [here](https://github.com/hpssjellis/maker100-curriculum) and the PortentaH7 Original Maker100 Course is [here](https://github.com/hpssjellis/maker100)
 
 This page as a website if github scares you [here](https://hpssjellis.github.io/my-examples-UnoQ-qualcomm-edgeimpulse-arduino/)
