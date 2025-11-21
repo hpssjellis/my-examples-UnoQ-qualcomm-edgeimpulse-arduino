@@ -15,7 +15,7 @@ float gyroX, gyroY, gyroZ;
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) delay(10);
+  // while (!Serial) delay(10);  // this will kill unoQ programs
 
   Serial.println("XIAOML Kit IMU Test");
   Serial.println("LSM6DS3TR-C 6-Axis IMU");
