@@ -15,7 +15,7 @@ float gyroX, gyroY, gyroZ;
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) delay(10);
+//  while (!Serial) delay(10);  // never use this it will block your program
 
   Serial.println("XIAOML Kit IMU Test");
   Serial.println("LSM6DS3TR-C 6-Axis IMU");
@@ -30,7 +30,9 @@ void setup() {
       Serial.println("Data Format: AccelX,AccelY,AccelZ,"
                     "GyroX,GyroY,GyroZ");
       Serial.println("Units: g-force, degrees/second");
-      Serial.println();
+      Serial.println(); 
+     Serial.println("X, Y, Z");
+    
   }
 }
 
@@ -40,6 +42,8 @@ void loop() {
   accelY = myIMU.readFloatAccelY();
   accelZ = myIMU.readFloatAccelZ();
 
+
+  /*
   // Read gyroscope data (in degrees per second)
   gyroX = myIMU.readFloatGyroX();
   gyroY = myIMU.readFloatGyroY();
@@ -53,5 +57,8 @@ void loop() {
   Serial.print(" Y="); Serial.print(gyroY, 2);
   Serial.print(" Z="); Serial.println(gyroZ, 2);
 
+  */
+
+  Serial.print(String(accelX, 3) + ", " + String(accelY, 3) + ", " + String(accelZ, 3) );
   delay(100); // 10 Hz update rate
 }
