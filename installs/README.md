@@ -55,3 +55,18 @@ sudo apt install --fix-broken
 ```
 
 then go to the programs and load it 
+
+
+# for webcam acces
+
+```
+groups
+```
+
+```
+sudo usermod -aG video $USER
+```
+
+Then reboot the system and run groups again to see
+if video has been added.
+
